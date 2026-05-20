@@ -286,6 +286,7 @@ function stepViewerZoom(direction) {
 }
 
 function defaultViewerScaleForViewport() {
+  if (window.matchMedia("(max-height: 480px) and (orientation: landscape)").matches) return 0.5;
   if (window.matchMedia("(max-width: 420px)").matches) return 0.5;
   if (window.matchMedia("(max-width: 700px)").matches) return 0.67;
   return 1;

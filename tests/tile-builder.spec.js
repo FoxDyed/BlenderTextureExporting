@@ -180,6 +180,39 @@ test("keeps controls usable on a narrow mobile viewport", async ({ page }) => {
   await expect(page.locator("#zoomScale")).toHaveText("Scale: 100% (1:1)");
 });
 
+test("keeps controls compact on a short mobile landscape viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await openApp(page);
+
+  await expect(page.locator("#zoomScale")).toHaveText("Scale: 50% (preview scaled)");
+  await expect(page.locator("#zoomScale")).toHaveClass(/is-scaled/);
+  await expect(page.getByRole("button", { name: "Export PNG" })).toBeVisible();
+  await expect(page.locator("#gridCanvas")).toBeVisible();
+
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    headerHeight: document.querySelector(".app-header").getBoundingClientRect().height,
+    panelWidth: document.querySelector(".control-panel").getBoundingClientRect().width,
+    panelHeight: document.querySelector(".control-panel").getBoundingClientRect().height,
+    toolbarHeight: document.querySelector(".canvas-toolbar").getBoundingClientRect().height,
+    workspaceLeft: document.querySelector(".workspace").getBoundingClientRect().left,
+    canvasTop: document.querySelector("#gridCanvas").getBoundingClientRect().top
+  }));
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  expect(layout.headerHeight).toBeLessThan(64);
+  expect(layout.panelWidth).toBeLessThan(300);
+  expect(layout.panelHeight).toBeLessThanOrEqual(335);
+  expect(layout.toolbarHeight).toBeLessThan(48);
+  expect(layout.workspaceLeft).toBeGreaterThan(layout.panelWidth - 1);
+  expect(layout.canvasTop).toBeLessThan(120);
+
+  await setProject(page, { cols: 3, rows: 3, tileWidth: 64, tileHeight: 32, exportCols: 2 });
+  await addTile(page, "red.png", pngs.red);
+  await clickCell(page, 1, 1);
+  await expect(page.locator("#placedCount")).toHaveText("1");
+});
+
 test("uploads, crops, places, erases, and clears a PNG tile", async ({ page }) => {
   await openApp(page);
   await setProject(page);

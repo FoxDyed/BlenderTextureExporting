@@ -578,3 +578,213 @@ button:focus-visible {
     gap: 10px;
   }
 }
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .app-header {
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+  }
+
+  .app-header h1 {
+    font-size: 1.05rem;
+    line-height: 1.05;
+  }
+
+  .eyebrow {
+    font-size: 0.62rem;
+    margin-bottom: 2px;
+  }
+
+  .app-header .primary-button {
+    align-self: center;
+    white-space: nowrap;
+  }
+
+  .app-shell {
+    grid-template-columns: minmax(232px, 280px) minmax(0, 1fr);
+    min-height: calc(100vh - 55px);
+  }
+
+  .control-panel {
+    gap: 8px;
+    max-height: calc(100vh - 55px);
+    overflow: auto;
+    padding: 10px;
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+  }
+
+  .control-panel section {
+    gap: 8px;
+  }
+
+  .control-panel h2 {
+    font-size: 0.84rem;
+  }
+
+  .field-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  label {
+    gap: 3px;
+    font-size: 0.68rem;
+  }
+
+  input[type="number"] {
+    padding: 5px 6px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .tool-button,
+  .file-picker span {
+    padding: 6px 8px;
+  }
+
+  .status-text {
+    font-size: 0.68rem;
+    line-height: 1.25;
+  }
+
+  .tool-row,
+  .stats {
+    gap: 6px;
+  }
+
+  .stats div {
+    padding: 6px;
+  }
+
+  .stats dt {
+    font-size: 0.65rem;
+  }
+
+  .stats dd {
+    font-size: 0.8rem;
+  }
+
+  .palette {
+    grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+    gap: 6px;
+    max-height: 88px;
+  }
+
+  .tile-card {
+    gap: 3px;
+    padding: 4px;
+  }
+
+  .tile-card span {
+    font-size: 0.6rem;
+  }
+
+  .workspace {
+    min-height: calc(100vh - 55px);
+  }
+
+  .canvas-toolbar {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    font-size: 0.68rem;
+  }
+
+  .viewer-meta {
+    gap: 8px;
+  }
+
+  .zoom-controls {
+    justify-content: flex-end;
+    gap: 5px;
+    margin-left: auto;
+  }
+
+  .zoom-button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .zoom-scale {
+    min-width: 116px;
+    padding: 5px 6px;
+  }
+
+  .compact-button {
+    padding: 5px 7px;
+  }
+
+  .canvas-scroll {
+    padding: 8px;
+  }
+
+  #gridCanvas {
+    box-shadow: none;
+  }
+
+  .crop-dialog {
+    width: min(640px, calc(100vw - 16px));
+    max-height: calc(100vh - 12px);
+  }
+
+  .crop-panel {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .crop-heading h2 {
+    font-size: 0.95rem;
+  }
+
+  .icon-button {
+    width: 30px;
+    height: 30px;
+    font-size: 1.15rem;
+  }
+
+  #cropCanvas {
+    max-height: 180px;
+  }
+
+  .crop-controls {
+    grid-template-columns: minmax(140px, 1fr) auto auto;
+    gap: 8px;
+  }
+}
+
+@media (max-height: 380px) and (orientation: landscape) {
+  .app-header {
+    padding: 6px 8px;
+  }
+
+  .app-header h1 {
+    font-size: 0.95rem;
+  }
+
+  .app-shell {
+    grid-template-columns: minmax(210px, 248px) minmax(0, 1fr);
+    min-height: calc(100vh - 45px);
+  }
+
+  .control-panel {
+    max-height: calc(100vh - 45px);
+    padding: 8px;
+  }
+
+  .canvas-toolbar {
+    padding: 5px 7px;
+  }
+
+  .viewer-meta span:last-child {
+    display: none;
+  }
+
+  .palette {
+    max-height: 62px;
+  }
+}
