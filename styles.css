@@ -3,6 +3,8 @@
   --bg: #f4f7f5;
   --panel: #ffffff;
   --panel-strong: #eef4f0;
+  --canvas-bg: #f9fbf9;
+  --checker-a: #d7dfda;
   --ink: #17211c;
   --muted: #5d6b62;
   --line: #cfdad3;
@@ -10,7 +12,32 @@
   --accent-strong: #155f58;
   --accent-soft: #d9eeea;
   --warn: #8a4d16;
+  --warn-soft: #fff4e7;
+  --grid-line: rgba(32, 118, 109, 0.28);
+  --grid-hover: rgba(32, 118, 109, 0.08);
+  --header-bg: rgba(255, 255, 255, 0.82);
   --shadow: 0 18px 45px rgba(23, 33, 28, 0.12);
+}
+
+body[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111715;
+  --panel: #18211d;
+  --panel-strong: #202c27;
+  --canvas-bg: #141b18;
+  --checker-a: #2f3b35;
+  --ink: #edf5ef;
+  --muted: #adbbb2;
+  --line: #33433c;
+  --accent: #34a99a;
+  --accent-strong: #7bd7cb;
+  --accent-soft: #173d39;
+  --warn: #ffd08a;
+  --warn-soft: #3a2a16;
+  --grid-line: rgba(123, 215, 203, 0.34);
+  --grid-hover: rgba(123, 215, 203, 0.1);
+  --header-bg: rgba(24, 33, 29, 0.88);
+  --shadow: 0 18px 45px rgba(0, 0, 0, 0.34);
 }
 
 * {
@@ -37,11 +64,19 @@ input {
   gap: 20px;
   padding: 22px 28px;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--header-bg);
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
   z-index: 4;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .app-header h1,
@@ -115,7 +150,7 @@ select {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
-  background: #fff;
+  background: var(--panel);
 }
 
 input[type="number"]:focus,
@@ -151,7 +186,7 @@ button:focus-visible {
   padding: 9px 12px;
   color: var(--accent-strong);
   border-color: var(--line);
-  background: #fff;
+  background: var(--panel);
 }
 
 .secondary-button:hover,
@@ -186,7 +221,7 @@ button:focus-visible {
   padding: 9px 10px;
   color: var(--muted);
   border-color: var(--line);
-  background: #fff;
+  background: var(--panel);
 }
 
 .tool-button.is-active {
@@ -218,7 +253,7 @@ button:focus-visible {
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   cursor: pointer;
 }
 
@@ -232,12 +267,12 @@ button:focus-visible {
   aspect-ratio: 1 / 1;
   object-fit: contain;
   border-radius: 6px;
-  background-color: #fff;
+  background-color: var(--panel);
   background-image:
-    linear-gradient(45deg, #d7dfda 25%, transparent 25%),
-    linear-gradient(-45deg, #d7dfda 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #d7dfda 75%),
-    linear-gradient(-45deg, transparent 75%, #d7dfda 75%);
+    linear-gradient(45deg, var(--checker-a) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--checker-a) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--checker-a) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--checker-a) 75%);
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
   background-size: 16px 16px;
 }
@@ -312,7 +347,7 @@ button:focus-visible {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--accent-strong);
-  background: #fff;
+  background: var(--panel);
   cursor: pointer;
   font-weight: 900;
 }
@@ -339,7 +374,7 @@ button:focus-visible {
 .zoom-scale.is-scaled {
   color: var(--warn);
   border-color: rgba(138, 77, 22, 0.38);
-  background: #fff4e7;
+  background: var(--warn-soft);
 }
 
 .compact-button {
@@ -355,7 +390,7 @@ button:focus-visible {
   display: block;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #f9fbf9;
+  background: var(--canvas-bg);
   box-shadow: var(--shadow);
   transform-origin: top left;
 }
@@ -391,7 +426,7 @@ button:focus-visible {
   height: 38px;
   color: var(--muted);
   border-color: var(--line);
-  background: #fff;
+  background: var(--panel);
   font-size: 1.45rem;
   line-height: 1;
 }
@@ -401,12 +436,12 @@ button:focus-visible {
   max-height: 420px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background-color: #fff;
+  background-color: var(--panel);
   background-image:
-    linear-gradient(45deg, #d7dfda 25%, transparent 25%),
-    linear-gradient(-45deg, #d7dfda 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #d7dfda 75%),
-    linear-gradient(-45deg, transparent 75%, #d7dfda 75%);
+    linear-gradient(45deg, var(--checker-a) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--checker-a) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--checker-a) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--checker-a) 75%);
   background-position: 0 0, 0 10px, 10px -10px, -10px 0;
   background-size: 20px 20px;
 }

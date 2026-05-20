@@ -28,6 +28,7 @@ const els = {
   paintTool: document.querySelector("#paintTool"),
   eraseTool: document.querySelector("#eraseTool"),
   clearGrid: document.querySelector("#clearGrid"),
+  themeToggle: document.querySelector("#themeToggle"),
   exportButton: document.querySelector("#exportButton"),
   placedCount: document.querySelector("#placedCount"),
   selectedTileName: document.querySelector("#selectedTileName"),
@@ -120,6 +121,26 @@ function setStatus(message) {
   els.projectStatus.textContent = message;
 }
 
+function cssVar(name) {
+  return getComputedStyle(document.body).getPropertyValue(name).trim();
+}
+
+function applyTheme(theme) {
+  const nextTheme = theme === "dark" ? "dark" : "light";
+  document.body.dataset.theme = nextTheme;
+  els.themeToggle.textContent = nextTheme === "dark" ? "Light Mode" : "Dark Mode";
+  els.themeToggle.setAttribute("aria-pressed", String(nextTheme === "dark"));
+  localStorage.setItem("tileBuilderTheme", nextTheme);
+  renderGrid();
+  drawCrop();
+}
+
+function initializeTheme() {
+  const storedTheme = localStorage.getItem("tileBuilderTheme");
+  const preferredTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  applyTheme(storedTheme || preferredTheme);
+}
+
 function resizeGridCanvas() {
   const pad = getGridPadding();
   els.gridCanvas.width = Math.ceil((state.cols + state.rows) * state.tileWidth / 2 + pad * 2);
@@ -166,7 +187,7 @@ function drawDiamond(ctx, x, y, options = {}) {
   ctx.lineTo(center.x, center.y + halfH);
   ctx.lineTo(center.x - halfW, center.y);
   ctx.closePath();
-  ctx.strokeStyle = options.stroke || "rgba(32, 118, 109, 0.28)";
+  ctx.strokeStyle = options.stroke || cssVar("--grid-line");
   ctx.lineWidth = options.lineWidth || 1;
   ctx.stroke();
   if (options.fill) {
@@ -177,7 +198,7 @@ function drawDiamond(ctx, x, y, options = {}) {
 
 function renderGrid() {
   gridCtx.clearRect(0, 0, els.gridCanvas.width, els.gridCanvas.height);
-  gridCtx.fillStyle = "#f9fbf9";
+  gridCtx.fillStyle = cssVar("--canvas-bg");
   gridCtx.fillRect(0, 0, els.gridCanvas.width, els.gridCanvas.height);
 
   for (let y = 0; y < state.rows; y += 1) {
@@ -188,9 +209,9 @@ function renderGrid() {
 
   if (state.hoverCell) {
     drawDiamond(gridCtx, state.hoverCell.x, state.hoverCell.y, {
-      stroke: "#20766d",
+      stroke: cssVar("--accent"),
       lineWidth: 2,
-      fill: "rgba(32, 118, 109, 0.08)"
+      fill: cssVar("--grid-hover")
     });
   }
 
@@ -451,7 +472,7 @@ function drawCrop() {
     cropState.image.width * cropState.scale,
     cropState.image.height * cropState.scale
   );
-  cropCtx.strokeStyle = "rgba(21, 95, 88, 0.9)";
+  cropCtx.strokeStyle = cssVar("--accent");
   cropCtx.lineWidth = 3;
   cropCtx.strokeRect(1.5, 1.5, els.cropCanvas.width - 3, els.cropCanvas.height - 3);
   updateCropSourceInfo();
@@ -622,6 +643,9 @@ els.eraseTool.addEventListener("click", () => {
   updateToolButtons();
 });
 els.clearGrid.addEventListener("click", clearGrid);
+els.themeToggle.addEventListener("click", () => {
+  applyTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+});
 els.exportButton.addEventListener("click", exportSpritesheet);
 els.zoomOut.addEventListener("click", () => stepViewerZoom(-1));
 els.zoomIn.addEventListener("click", () => stepViewerZoom(1));
@@ -672,6 +696,7 @@ els.cropCanvas.addEventListener("pointercancel", () => {
   if (cropState) cropState.dragging = false;
 });
 
+initializeTheme();
 resizeGridCanvas();
 renderPalette();
 renderGrid();

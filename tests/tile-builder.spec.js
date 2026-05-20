@@ -184,6 +184,45 @@ test("zooms the grid viewer and labels non-1:1 preview scale", async ({ page }) 
   await expect(page.locator("#zoomScale")).toHaveClass(/is-scaled/);
 });
 
+test("toggles dark mode and persists the display preference", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => localStorage.removeItem("tileBuilderTheme"));
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Dark Mode" })).toBeVisible();
+
+  const lightBackground = await page.locator("body").evaluate((body) => getComputedStyle(body).backgroundColor);
+  await page.getByRole("button", { name: "Dark Mode" }).click();
+  await expect(page.locator("body")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByRole("button", { name: "Light Mode" })).toHaveAttribute("aria-pressed", "true");
+  const darkBackground = await page.locator("body").evaluate((body) => getComputedStyle(body).backgroundColor);
+  expect(darkBackground).not.toBe(lightBackground);
+  expect(await page.evaluate(() => localStorage.getItem("tileBuilderTheme"))).toBe("dark");
+
+  await page.reload();
+  await expect(page.locator("body")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByRole("button", { name: "Light Mode" })).toBeVisible();
+
+  await setProject(page);
+  await addTile(page, "red.png", pngs.red);
+  await clickCell(page, 1, 0);
+  await page.getByRole("button", { name: "Export PNG" }).click();
+
+  const exportInfo = await page.waitForFunction(() => window.__lastTileDownload);
+  const exported = await exportInfo.jsonValue();
+  const sampled = await page.evaluate(async (href) => {
+    const image = new Image();
+    image.src = href;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0);
+    return [...ctx.getImageData(32, 16, 1, 1).data];
+  }, exported.href);
+  expect(sampled[0]).toBeGreaterThan(sampled[2]);
+});
+
 test("keeps controls usable on a narrow mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openApp(page);
