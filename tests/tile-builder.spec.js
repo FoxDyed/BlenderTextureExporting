@@ -129,6 +129,25 @@ test("loads the static page and applies custom project settings", async ({ page 
   await expect(page.locator("#gridCanvas")).toHaveJSProperty("height", 208);
 });
 
+test("zooms the grid viewer and labels non-1:1 preview scale", async ({ page }) => {
+  await openApp(page);
+  await expect(page.locator("#zoomScale")).toHaveText("Scale: 100% (1:1)");
+  await expect(page.locator("#zoomScale")).not.toHaveClass(/is-scaled/);
+
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect(page.locator("#zoomScale")).toHaveText("Scale: 125% (preview scaled)");
+  await expect(page.locator("#zoomScale")).toHaveClass(/is-scaled/);
+  await expect(page.locator("#gridCanvas")).toHaveCSS("transform", /matrix\(1\.25/);
+
+  await page.getByRole("button", { name: "1:1" }).click();
+  await expect(page.locator("#zoomScale")).toHaveText("Scale: 100% (1:1)");
+  await expect(page.locator("#zoomScale")).not.toHaveClass(/is-scaled/);
+
+  await page.getByRole("button", { name: "Zoom out" }).click();
+  await expect(page.locator("#zoomScale")).toHaveText("Scale: 75% (preview scaled)");
+  await expect(page.locator("#zoomScale")).toHaveClass(/is-scaled/);
+});
+
 test("uploads, crops, places, erases, and clears a PNG tile", async ({ page }) => {
   await openApp(page);
   await setProject(page);

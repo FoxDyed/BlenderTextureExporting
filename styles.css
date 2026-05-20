@@ -281,6 +281,7 @@ button:focus-visible {
 
 .canvas-toolbar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 12px 18px;
@@ -288,6 +289,58 @@ button:focus-visible {
   color: var(--muted);
   font-size: 0.84rem;
   font-weight: 700;
+}
+
+.viewer-meta,
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.zoom-controls {
+  justify-content: flex-end;
+}
+
+.zoom-button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  background: #fff;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.zoom-button:hover {
+  border-color: var(--accent);
+}
+
+.zoom-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.zoom-scale {
+  min-width: 154px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--panel-strong);
+  text-align: center;
+}
+
+.zoom-scale.is-scaled {
+  color: var(--warn);
+  border-color: rgba(138, 77, 22, 0.38);
+  background: #fff4e7;
+}
+
+.compact-button {
+  padding: 7px 10px;
 }
 
 .canvas-scroll {
@@ -301,6 +354,7 @@ button:focus-visible {
   border-radius: 8px;
   background: #f9fbf9;
   box-shadow: var(--shadow);
+  transform-origin: top left;
 }
 
 .crop-dialog {
@@ -378,5 +432,14 @@ button:focus-visible {
 
   .crop-controls {
     grid-template-columns: 1fr;
+  }
+
+  .canvas-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .zoom-controls {
+    justify-content: flex-start;
   }
 }

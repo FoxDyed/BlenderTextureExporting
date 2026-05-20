@@ -8,8 +8,11 @@ const state = {
   selectedTileId: null,
   tool: "paint",
   placements: new Map(),
-  hoverCell: null
+  hoverCell: null,
+  viewerScale: 1
 };
+
+const viewerZoomLevels = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4];
 
 const els = {
   gridCols: document.querySelector("#gridCols"),
@@ -28,6 +31,10 @@ const els = {
   placedCount: document.querySelector("#placedCount"),
   selectedTileName: document.querySelector("#selectedTileName"),
   hoverCell: document.querySelector("#hoverCell"),
+  zoomOut: document.querySelector("#zoomOut"),
+  zoomIn: document.querySelector("#zoomIn"),
+  zoomReset: document.querySelector("#zoomReset"),
+  zoomScale: document.querySelector("#zoomScale"),
   gridCanvas: document.querySelector("#gridCanvas"),
   cropDialog: document.querySelector("#cropDialog"),
   cropTitle: document.querySelector("#cropTitle"),
@@ -96,6 +103,7 @@ function applySettings() {
   renderPalette();
   resizeGridCanvas();
   renderGrid();
+  updateViewerZoom();
   updateStats();
 }
 
@@ -243,6 +251,38 @@ function updateStats() {
   els.selectedTileName.textContent = selected ? selected.name : "None";
 }
 
+function viewerScaleLabel() {
+  const percent = Math.round(state.viewerScale * 100);
+  return state.viewerScale === 1 ? `Scale: ${percent}% (1:1)` : `Scale: ${percent}% (preview scaled)`;
+}
+
+function updateViewerZoom() {
+  els.gridCanvas.style.transform = `scale(${state.viewerScale})`;
+  els.gridCanvas.style.width = `${els.gridCanvas.width}px`;
+  els.gridCanvas.style.height = `${els.gridCanvas.height}px`;
+  els.gridCanvas.style.marginRight = `${Math.max(0, els.gridCanvas.width * state.viewerScale - els.gridCanvas.width)}px`;
+  els.gridCanvas.style.marginBottom = `${Math.max(0, els.gridCanvas.height * state.viewerScale - els.gridCanvas.height)}px`;
+  els.zoomScale.textContent = viewerScaleLabel();
+  els.zoomScale.classList.toggle("is-scaled", state.viewerScale !== 1);
+  els.zoomOut.disabled = state.viewerScale === viewerZoomLevels[0];
+  els.zoomIn.disabled = state.viewerScale === viewerZoomLevels[viewerZoomLevels.length - 1];
+}
+
+function setViewerScale(nextScale) {
+  state.viewerScale = Number(nextScale.toFixed(2));
+  updateViewerZoom();
+}
+
+function stepViewerZoom(direction) {
+  const currentIndex = viewerZoomLevels.findIndex((level) => level === state.viewerScale);
+  const fallbackIndex = viewerZoomLevels.reduce((best, level, index) => {
+    return Math.abs(level - state.viewerScale) < Math.abs(viewerZoomLevels[best] - state.viewerScale) ? index : best;
+  }, 0);
+  const index = currentIndex === -1 ? fallbackIndex : currentIndex;
+  const nextIndex = Math.min(viewerZoomLevels.length - 1, Math.max(0, index + direction));
+  setViewerScale(viewerZoomLevels[nextIndex]);
+}
+
 async function readImageFile(file) {
   const url = URL.createObjectURL(file);
   const image = new Image();
@@ -383,8 +423,8 @@ function canvasPointFromEvent(event) {
   const scaleX = els.gridCanvas.width / rect.width;
   const scaleY = els.gridCanvas.height / rect.height;
   return {
-    x: (event.clientX - rect.left) * scaleX,
-    y: (event.clientY - rect.top) * scaleY
+    x: (event.clientX - rect.left) * scaleX * state.viewerScale,
+    y: (event.clientY - rect.top) * scaleY * state.viewerScale
   };
 }
 
@@ -495,6 +535,9 @@ els.eraseTool.addEventListener("click", () => {
 });
 els.clearGrid.addEventListener("click", clearGrid);
 els.exportButton.addEventListener("click", exportSpritesheet);
+els.zoomOut.addEventListener("click", () => stepViewerZoom(-1));
+els.zoomIn.addEventListener("click", () => stepViewerZoom(1));
+els.zoomReset.addEventListener("click", () => setViewerScale(1));
 els.gridCanvas.addEventListener("pointermove", handleGridPointerMove);
 els.gridCanvas.addEventListener("pointerleave", () => {
   state.hoverCell = null;
@@ -536,6 +579,7 @@ els.cropCanvas.addEventListener("pointercancel", () => {
 resizeGridCanvas();
 renderPalette();
 renderGrid();
+updateViewerZoom();
 updateStats();
 setStatus("Ready. Add PNGs, crop them, then paint the isometric grid.");
 
@@ -547,6 +591,7 @@ window.__tileBuilderDebug = {
       tileWidth: state.tileWidth,
       tileHeight: state.tileHeight,
       exportCols: state.exportCols,
+      viewerScale: state.viewerScale,
       placedCount: state.placements.size,
       selectedTileId: state.selectedTileId
     };
