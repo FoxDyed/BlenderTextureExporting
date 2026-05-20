@@ -40,6 +40,14 @@ const els = {
   cropDialog: document.querySelector("#cropDialog"),
   cropTitle: document.querySelector("#cropTitle"),
   cropCanvas: document.querySelector("#cropCanvas"),
+  cropScaleMode: document.querySelector("#cropScaleMode"),
+  cropSourceInfo: document.querySelector("#cropSourceInfo"),
+  alignTop: document.querySelector("#alignTop"),
+  alignMiddle: document.querySelector("#alignMiddle"),
+  alignBottom: document.querySelector("#alignBottom"),
+  alignLeft: document.querySelector("#alignLeft"),
+  alignCenterX: document.querySelector("#alignCenterX"),
+  alignRight: document.querySelector("#alignRight"),
   cropZoom: document.querySelector("#cropZoom"),
   centerCrop: document.querySelector("#centerCrop"),
   saveCrop: document.querySelector("#saveCrop"),
@@ -326,6 +334,7 @@ async function processNextCrop() {
       image,
       sourceUrl: url,
       scale: 1,
+      scaleMode: els.cropScaleMode.value,
       offsetX: 0,
       offsetY: 0,
       dragging: false,
@@ -361,12 +370,74 @@ function centerCropImage() {
   if (!cropState) return;
   const scaleX = els.cropCanvas.width / cropState.image.width;
   const scaleY = els.cropCanvas.height / cropState.image.height;
-  cropState.scale = Math.max(scaleX, scaleY);
+  cropState.scale = cropScaleForMode(cropState.scaleMode || "free");
   cropState.offsetX = (els.cropCanvas.width - cropState.image.width * cropState.scale) / 2;
   cropState.offsetY = (els.cropCanvas.height - cropState.image.height * cropState.scale) / 2;
-  els.cropZoom.value = String(cropState.scale);
   els.cropZoom.min = String(Math.max(0.05, Math.min(scaleX, scaleY) * 0.5));
   els.cropZoom.max = String(Math.max(4, cropState.scale * 4));
+  syncCropControls();
+  drawCrop();
+}
+
+function cropScaleForMode(mode) {
+  if (!cropState) return 1;
+  const scaleX = els.cropCanvas.width / cropState.image.width;
+  const scaleY = els.cropCanvas.height / cropState.image.height;
+  if (mode === "fit") return Math.min(scaleX, scaleY);
+  if (mode === "free") return Math.max(scaleX, scaleY);
+  const sourceScale = Number.parseFloat(mode);
+  if (!Number.isFinite(sourceScale) || sourceScale <= 0) return Math.max(scaleX, scaleY);
+  return els.cropCanvas.width / (state.tileWidth / sourceScale);
+}
+
+function syncCropControls() {
+  if (!cropState) return;
+  els.cropScaleMode.value = cropState.scaleMode || "free";
+  els.cropZoom.value = String(cropState.scale);
+  els.cropZoom.disabled = cropState.scaleMode !== "free";
+  updateCropSourceInfo();
+}
+
+function updateCropSourceInfo() {
+  if (!cropState) {
+    els.cropSourceInfo.textContent = "Crop source: auto";
+    return;
+  }
+  const sourceWidth = Math.round(els.cropCanvas.width / cropState.scale);
+  const sourceHeight = Math.round(els.cropCanvas.height / cropState.scale);
+  const modeText = cropState.scaleMode === "free" ? "free zoom" : cropState.scaleMode === "fit" ? "fit image" : `${cropState.scaleMode}x locked`;
+  els.cropSourceInfo.textContent = `Crop source: ${sourceWidth}x${sourceHeight}px (${modeText})`;
+}
+
+function setCropScaleMode(mode) {
+  if (!cropState) return;
+  const previousScale = cropState.scale;
+  const centerX = els.cropCanvas.width / 2;
+  const centerY = els.cropCanvas.height / 2;
+  const imagePointX = (centerX - cropState.offsetX) / previousScale;
+  const imagePointY = (centerY - cropState.offsetY) / previousScale;
+  cropState.scaleMode = mode;
+  cropState.scale = cropScaleForMode(mode);
+  cropState.offsetX = centerX - imagePointX * cropState.scale;
+  cropState.offsetY = centerY - imagePointY * cropState.scale;
+  syncCropControls();
+  drawCrop();
+}
+
+function alignCrop(axis, position) {
+  if (!cropState) return;
+  const drawnWidth = cropState.image.width * cropState.scale;
+  const drawnHeight = cropState.image.height * cropState.scale;
+  if (axis === "x") {
+    if (position === "start") cropState.offsetX = 0;
+    if (position === "center") cropState.offsetX = (els.cropCanvas.width - drawnWidth) / 2;
+    if (position === "end") cropState.offsetX = els.cropCanvas.width - drawnWidth;
+  }
+  if (axis === "y") {
+    if (position === "start") cropState.offsetY = 0;
+    if (position === "center") cropState.offsetY = (els.cropCanvas.height - drawnHeight) / 2;
+    if (position === "end") cropState.offsetY = els.cropCanvas.height - drawnHeight;
+  }
   drawCrop();
 }
 
@@ -383,6 +454,7 @@ function drawCrop() {
   cropCtx.strokeStyle = "rgba(21, 95, 88, 0.9)";
   cropCtx.lineWidth = 3;
   cropCtx.strokeRect(1.5, 1.5, els.cropCanvas.width - 3, els.cropCanvas.height - 3);
+  updateCropSourceInfo();
 }
 
 function saveCurrentCrop() {
@@ -514,6 +586,7 @@ function exportSpritesheet() {
 
 function handleCropZoom() {
   if (!cropState) return;
+  cropState.scaleMode = "free";
   const previousScale = cropState.scale;
   const nextScale = Number.parseFloat(els.cropZoom.value);
   const centerX = els.cropCanvas.width / 2;
@@ -523,6 +596,7 @@ function handleCropZoom() {
   cropState.scale = nextScale;
   cropState.offsetX = centerX - imagePointX * nextScale;
   cropState.offsetY = centerY - imagePointY * nextScale;
+  syncCropControls();
   drawCrop();
 }
 
@@ -562,7 +636,14 @@ els.gridCanvas.addEventListener("pointerleave", () => {
 els.gridCanvas.addEventListener("click", handleGridClick);
 
 els.cropZoom.addEventListener("input", handleCropZoom);
+els.cropScaleMode.addEventListener("change", () => setCropScaleMode(els.cropScaleMode.value));
 els.centerCrop.addEventListener("click", centerCropImage);
+els.alignTop.addEventListener("click", () => alignCrop("y", "start"));
+els.alignMiddle.addEventListener("click", () => alignCrop("y", "center"));
+els.alignBottom.addEventListener("click", () => alignCrop("y", "end"));
+els.alignLeft.addEventListener("click", () => alignCrop("x", "start"));
+els.alignCenterX.addEventListener("click", () => alignCrop("x", "center"));
+els.alignRight.addEventListener("click", () => alignCrop("x", "end"));
 els.saveCrop.addEventListener("click", saveCurrentCrop);
 els.skipCrop.addEventListener("click", skipCurrentCrop);
 els.cropCanvas.addEventListener("pointerdown", (event) => {

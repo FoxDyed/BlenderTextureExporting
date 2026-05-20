@@ -103,6 +103,27 @@
           <button id="skipCrop" class="icon-button" value="skip" type="button" aria-label="Skip this PNG">&times;</button>
         </div>
         <canvas id="cropCanvas" width="560" height="280"></canvas>
+        <div class="crop-scale-tools">
+          <label>
+            Source scale
+            <select id="cropScaleMode">
+              <option value="free">Free zoom</option>
+              <option value="1">1x source pixels</option>
+              <option value="2">2x close crop</option>
+              <option value="0.5">0.5x wide crop</option>
+              <option value="fit">Fit image</option>
+            </select>
+          </label>
+          <p id="cropSourceInfo" class="status-text">Crop source: auto</p>
+        </div>
+        <div class="crop-align-tools" aria-label="Crop alignment tools">
+          <button id="alignTop" class="secondary-button" type="button">Top</button>
+          <button id="alignMiddle" class="secondary-button" type="button">Middle</button>
+          <button id="alignBottom" class="secondary-button" type="button">Bottom</button>
+          <button id="alignLeft" class="secondary-button" type="button">Left</button>
+          <button id="alignCenterX" class="secondary-button" type="button">Center X</button>
+          <button id="alignRight" class="secondary-button" type="button">Right</button>
+        </div>
         <div class="crop-controls">
           <label>
             Zoom

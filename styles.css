@@ -103,11 +103,13 @@ label {
 }
 
 input[type="number"],
-input[type="range"] {
+input[type="range"],
+select {
   min-width: 0;
 }
 
-input[type="number"] {
+input[type="number"],
+select {
   width: 100%;
   padding: 9px 10px;
   border: 1px solid var(--line);
@@ -118,6 +120,7 @@ input[type="number"] {
 
 input[type="number"]:focus,
 input[type="range"]:focus,
+select:focus,
 button:focus-visible {
   outline: 3px solid rgba(32, 118, 109, 0.24);
   outline-offset: 2px;
@@ -415,6 +418,23 @@ button:focus-visible {
   gap: 12px;
 }
 
+.crop-scale-tools {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  align-items: end;
+  gap: 12px;
+}
+
+.crop-align-tools {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.crop-align-tools .secondary-button {
+  padding: 7px 8px;
+}
+
 @media (max-width: 860px) {
   .app-header {
     align-items: stretch;
@@ -501,7 +521,8 @@ button:focus-visible {
     font-size: 0.76rem;
   }
 
-  input[type="number"] {
+  input[type="number"],
+  select {
     padding: 7px 8px;
   }
 
@@ -577,6 +598,15 @@ button:focus-visible {
   .crop-heading {
     gap: 10px;
   }
+
+  .crop-scale-tools {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .crop-align-tools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-height: 480px) and (orientation: landscape) {
@@ -635,7 +665,8 @@ button:focus-visible {
     font-size: 0.68rem;
   }
 
-  input[type="number"] {
+  input[type="number"],
+  select {
     padding: 5px 6px;
   }
 
@@ -754,6 +785,20 @@ button:focus-visible {
   .crop-controls {
     grid-template-columns: minmax(140px, 1fr) auto auto;
     gap: 8px;
+  }
+
+  .crop-scale-tools {
+    grid-template-columns: minmax(150px, 200px) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .crop-align-tools {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .crop-align-tools .secondary-button {
+    padding: 5px 6px;
   }
 }
 

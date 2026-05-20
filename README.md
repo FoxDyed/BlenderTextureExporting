@@ -9,6 +9,8 @@ Live site: <https://foxdyed.github.io/BlenderTextureExporting/>
 
 - Upload one or more PNG files.
 - Crop each incoming PNG to the configured tile width and height.
+- Lock crop source scale and align/pan tall or wide source images before
+  cropping.
 - Place cropped tiles onto a custom isometric diamond grid.
 - Erase or replace placed tiles.
 - Export placed tiles as a packed transparent PNG spritesheet sorted by grid

@@ -43,9 +43,44 @@ function createSolidPng([red, green, blue, alpha]) {
   ]);
 }
 
+function createVerticalSplitPng(width, height, topColor, bottomColor) {
+  const signature = Buffer.from("89504e470d0a1a0a", "hex");
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+
+  const stride = 1 + width * 4;
+  const rawPixels = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y += 1) {
+    const color = y < height / 2 ? topColor : bottomColor;
+    const rowStart = y * stride;
+    rawPixels[rowStart] = 0;
+    for (let x = 0; x < width; x += 1) {
+      const pixelStart = rowStart + 1 + x * 4;
+      rawPixels[pixelStart] = color[0];
+      rawPixels[pixelStart + 1] = color[1];
+      rawPixels[pixelStart + 2] = color[2];
+      rawPixels[pixelStart + 3] = color[3];
+    }
+  }
+
+  return Buffer.concat([
+    signature,
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", zlib.deflateSync(rawPixels)),
+    pngChunk("IEND", Buffer.alloc(0))
+  ]);
+}
+
 const pngs = {
   red: createSolidPng([255, 0, 0, 255]),
-  blue: createSolidPng([0, 0, 255, 255])
+  blue: createSolidPng([0, 0, 255, 255]),
+  splitTall: createVerticalSplitPng(128, 256, [255, 0, 0, 255], [0, 0, 255, 255])
 };
 
 async function openApp(page) {
@@ -232,6 +267,37 @@ test("uploads, crops, places, erases, and clears a PNG tile", async ({ page }) =
   await expect(page.locator("#placedCount")).toHaveText("1");
   await page.getByRole("button", { name: "Clear Grid" }).click();
   await expect(page.locator("#placedCount")).toHaveText("0");
+});
+
+test("locks crop source scale and aligns to the bottom half of a tall PNG", async ({ page }) => {
+  await openApp(page);
+  await setProject(page, { cols: 2, rows: 2, tileWidth: 128, tileHeight: 128, exportCols: 1 });
+
+  await page.locator("#fileInput").setInputFiles({
+    name: "split-tall.png",
+    mimeType: "image/png",
+    buffer: pngs.splitTall
+  });
+
+  await expect(page.locator("#cropDialog")).toHaveJSProperty("open", true);
+  await page.locator("#cropScaleMode").selectOption("1");
+  await expect(page.locator("#cropSourceInfo")).toHaveText("Crop source: 128x128px (1x locked)");
+  await page.getByRole("button", { name: "Bottom" }).click();
+  await page.getByRole("button", { name: "Add Tile" }).click();
+  await expect(page.locator("#cropDialog")).toHaveJSProperty("open", false);
+
+  const sampled = await page.locator(".tile-card img").evaluate(async (image) => {
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0);
+    return [...ctx.getImageData(64, 64, 1, 1).data];
+  });
+
+  expect(sampled[2]).toBeGreaterThan(sampled[0]);
+  expect(sampled[3]).toBe(255);
 });
 
 test("exports placed tiles as a Y-then-X sorted packed PNG", async ({ page }) => {
