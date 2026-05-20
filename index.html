@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Isometric Tile Spritesheet Builder</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Godot tile workflow</p>
+        <h1>Isometric Tile Spritesheet Builder</h1>
+      </div>
+      <button id="exportButton" class="primary-button" type="button">Export PNG</button>
+    </header>
+
+    <main class="app-shell">
+      <aside class="control-panel" aria-label="Project controls">
+        <section>
+          <h2>Project</h2>
+          <div class="field-grid">
+            <label>
+              Columns
+              <input id="gridCols" type="number" min="1" max="64" value="8">
+            </label>
+            <label>
+              Rows
+              <input id="gridRows" type="number" min="1" max="64" value="8">
+            </label>
+            <label>
+              Tile width
+              <input id="tileWidth" type="number" min="8" max="1024" value="128">
+            </label>
+            <label>
+              Tile height
+              <input id="tileHeight" type="number" min="8" max="1024" value="64">
+            </label>
+            <label>
+              Export columns
+              <input id="exportCols" type="number" min="1" max="64" value="8">
+            </label>
+          </div>
+          <button id="applySettings" class="secondary-button" type="button">Apply Settings</button>
+          <p id="projectStatus" class="status-text" aria-live="polite"></p>
+        </section>
+
+        <section>
+          <h2>Tiles</h2>
+          <label class="file-picker">
+            <span>Add PNGs</span>
+            <input id="fileInput" type="file" accept="image/png" multiple>
+          </label>
+          <div class="tool-row" role="group" aria-label="Grid tools">
+            <button id="paintTool" class="tool-button is-active" type="button">Paint</button>
+            <button id="eraseTool" class="tool-button" type="button">Erase</button>
+          </div>
+          <div id="palette" class="palette" aria-label="Tile palette"></div>
+        </section>
+
+        <section>
+          <h2>Grid</h2>
+          <button id="clearGrid" class="secondary-button" type="button">Clear Grid</button>
+          <dl class="stats">
+            <div>
+              <dt>Placed</dt>
+              <dd id="placedCount">0</dd>
+            </div>
+            <div>
+              <dt>Selected</dt>
+              <dd id="selectedTileName">None</dd>
+            </div>
+          </dl>
+        </section>
+      </aside>
+
+      <section class="workspace" aria-label="Tile grid workspace">
+        <div class="canvas-toolbar">
+          <span id="hoverCell">Cell: none</span>
+          <span>Y sort export: row first, then column</span>
+        </div>
+        <div class="canvas-scroll">
+          <canvas id="gridCanvas" width="900" height="620" aria-label="Isometric tile placement grid"></canvas>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="cropDialog" class="crop-dialog">
+      <form method="dialog" class="crop-panel">
+        <div class="crop-heading">
+          <div>
+            <p class="eyebrow">Crop PNG</p>
+            <h2 id="cropTitle">Prepare tile</h2>
+          </div>
+          <button id="skipCrop" class="icon-button" value="skip" type="button" aria-label="Skip this PNG">&times;</button>
+        </div>
+        <canvas id="cropCanvas" width="560" height="280"></canvas>
+        <div class="crop-controls">
+          <label>
+            Zoom
+            <input id="cropZoom" type="range" min="0.25" max="4" step="0.01" value="1">
+          </label>
+          <button id="centerCrop" class="secondary-button" type="button">Center</button>
+          <button id="saveCrop" class="primary-button" value="save" type="button">Add Tile</button>
+        </div>
+        <p class="status-text">Drag inside the preview to position the image. Transparent pixels are preserved.</p>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>

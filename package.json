@@ -1,0 +1,14 @@
+{
+  "name": "isometric-tile-spritesheet-builder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static GitHub Pages tool for building Godot-ready isometric tile spritesheets.",
+  "scripts": {
+    "install:browsers": "playwright install chromium",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
+  }
+}
