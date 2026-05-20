@@ -78,6 +78,7 @@ async function addTile(page, name, buffer) {
 }
 
 async function clickCell(page, x, y) {
+  await page.locator("#gridCanvas").scrollIntoViewIfNeeded();
   const point = await page.locator("#gridCanvas").evaluate((canvas, cell) => {
     const state = window.__tileBuilderDebug.getState();
     const rect = canvas.getBoundingClientRect();
@@ -146,6 +147,37 @@ test("zooms the grid viewer and labels non-1:1 preview scale", async ({ page }) 
   await page.getByRole("button", { name: "Zoom out" }).click();
   await expect(page.locator("#zoomScale")).toHaveText("Scale: 75% (preview scaled)");
   await expect(page.locator("#zoomScale")).toHaveClass(/is-scaled/);
+});
+
+test("keeps controls usable on a narrow mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openApp(page);
+
+  await expect(page.locator("#zoomScale")).toHaveText("Scale: 50% (preview scaled)");
+  await expect(page.locator("#zoomScale")).toHaveClass(/is-scaled/);
+  await expect(page.getByRole("button", { name: "Export PNG" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Apply Settings" })).toBeVisible();
+  await expect(page.locator("#gridCanvas")).toBeVisible();
+
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    headerHeight: document.querySelector(".app-header").getBoundingClientRect().height,
+    controlTop: document.querySelector(".control-panel").getBoundingClientRect().top,
+    toolbarHeight: document.querySelector(".canvas-toolbar").getBoundingClientRect().height
+  }));
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  expect(layout.headerHeight).toBeLessThan(120);
+  expect(layout.controlTop).toBeGreaterThanOrEqual(0);
+  expect(layout.toolbarHeight).toBeLessThan(96);
+
+  await setProject(page, { cols: 3, rows: 3, tileWidth: 64, tileHeight: 32, exportCols: 2 });
+  await addTile(page, "red.png", pngs.red);
+  await clickCell(page, 1, 1);
+  await expect(page.locator("#placedCount")).toHaveText("1");
+
+  await page.getByRole("button", { name: "1:1" }).click();
+  await expect(page.locator("#zoomScale")).toHaveText("Scale: 100% (1:1)");
 });
 
 test("uploads, crops, places, erases, and clears a PNG tile", async ({ page }) => {

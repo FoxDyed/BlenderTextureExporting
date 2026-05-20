@@ -419,15 +419,33 @@ button:focus-visible {
   .app-header {
     align-items: stretch;
     flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .app-header h1 {
+    font-size: 1.35rem;
+    line-height: 1.1;
+  }
+
+  .app-header .primary-button {
+    align-self: flex-start;
   }
 
   .app-shell {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
 
   .control-panel {
+    gap: 12px;
+    padding: 14px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+
+  .control-panel section {
+    gap: 10px;
   }
 
   .crop-controls {
@@ -441,5 +459,122 @@ button:focus-visible {
 
   .zoom-controls {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 520px) {
+  .app-header {
+    position: static;
+    padding: 12px;
+  }
+
+  .app-header h1 {
+    font-size: 1.15rem;
+  }
+
+  .eyebrow {
+    font-size: 0.68rem;
+    margin-bottom: 3px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .tool-button,
+  .file-picker span {
+    padding: 8px 10px;
+  }
+
+  .control-panel {
+    padding: 12px;
+  }
+
+  .control-panel h2 {
+    font-size: 0.92rem;
+  }
+
+  .field-grid {
+    gap: 8px;
+  }
+
+  label {
+    gap: 4px;
+    font-size: 0.76rem;
+  }
+
+  input[type="number"] {
+    padding: 7px 8px;
+  }
+
+  .status-text {
+    font-size: 0.76rem;
+  }
+
+  .palette {
+    grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+    gap: 8px;
+    max-height: 178px;
+  }
+
+  .tile-card {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .tile-card span {
+    font-size: 0.66rem;
+  }
+
+  .stats {
+    gap: 8px;
+  }
+
+  .stats div {
+    padding: 8px;
+  }
+
+  .canvas-toolbar {
+    gap: 8px;
+    padding: 9px 10px;
+    font-size: 0.74rem;
+  }
+
+  .viewer-meta,
+  .zoom-controls {
+    gap: 7px;
+  }
+
+  .zoom-button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .zoom-scale {
+    min-width: 128px;
+    padding: 6px 8px;
+  }
+
+  .compact-button {
+    padding: 6px 8px;
+  }
+
+  .canvas-scroll {
+    padding: 10px;
+  }
+
+  #gridCanvas {
+    box-shadow: none;
+  }
+
+  .crop-dialog {
+    width: calc(100vw - 16px);
+  }
+
+  .crop-panel {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .crop-heading {
+    gap: 10px;
   }
 }

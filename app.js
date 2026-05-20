@@ -9,7 +9,8 @@ const state = {
   tool: "paint",
   placements: new Map(),
   hoverCell: null,
-  viewerScale: 1
+  viewerScale: 1,
+  userSetViewerScale: false
 };
 
 const viewerZoomLevels = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4];
@@ -268,8 +269,9 @@ function updateViewerZoom() {
   els.zoomIn.disabled = state.viewerScale === viewerZoomLevels[viewerZoomLevels.length - 1];
 }
 
-function setViewerScale(nextScale) {
+function setViewerScale(nextScale, userInitiated = true) {
   state.viewerScale = Number(nextScale.toFixed(2));
+  if (userInitiated) state.userSetViewerScale = true;
   updateViewerZoom();
 }
 
@@ -281,6 +283,17 @@ function stepViewerZoom(direction) {
   const index = currentIndex === -1 ? fallbackIndex : currentIndex;
   const nextIndex = Math.min(viewerZoomLevels.length - 1, Math.max(0, index + direction));
   setViewerScale(viewerZoomLevels[nextIndex]);
+}
+
+function defaultViewerScaleForViewport() {
+  if (window.matchMedia("(max-width: 420px)").matches) return 0.5;
+  if (window.matchMedia("(max-width: 700px)").matches) return 0.67;
+  return 1;
+}
+
+function applyResponsiveViewerScale() {
+  if (state.userSetViewerScale) return;
+  setViewerScale(defaultViewerScaleForViewport(), false);
 }
 
 async function readImageFile(file) {
@@ -423,8 +436,8 @@ function canvasPointFromEvent(event) {
   const scaleX = els.gridCanvas.width / rect.width;
   const scaleY = els.gridCanvas.height / rect.height;
   return {
-    x: (event.clientX - rect.left) * scaleX * state.viewerScale,
-    y: (event.clientY - rect.top) * scaleY * state.viewerScale
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY
   };
 }
 
@@ -538,6 +551,7 @@ els.exportButton.addEventListener("click", exportSpritesheet);
 els.zoomOut.addEventListener("click", () => stepViewerZoom(-1));
 els.zoomIn.addEventListener("click", () => stepViewerZoom(1));
 els.zoomReset.addEventListener("click", () => setViewerScale(1));
+window.addEventListener("resize", applyResponsiveViewerScale);
 els.gridCanvas.addEventListener("pointermove", handleGridPointerMove);
 els.gridCanvas.addEventListener("pointerleave", () => {
   state.hoverCell = null;
@@ -579,7 +593,7 @@ els.cropCanvas.addEventListener("pointercancel", () => {
 resizeGridCanvas();
 renderPalette();
 renderGrid();
-updateViewerZoom();
+applyResponsiveViewerScale();
 updateStats();
 setStatus("Ready. Add PNGs, crop them, then paint the isometric grid.");
 
