@@ -3,6 +3,8 @@ const state = {
   rows: 8,
   tileWidth: 128,
   tileHeight: 64,
+  spriteWidth: 128,
+  spriteHeight: 128,
   exportCols: 8,
   tiles: [],
   selectedTileId: null,
@@ -28,6 +30,8 @@ const els = {
   gridRows: document.querySelector("#gridRows"),
   tileWidth: document.querySelector("#tileWidth"),
   tileHeight: document.querySelector("#tileHeight"),
+  spriteWidth: document.querySelector("#spriteWidth"),
+  spriteHeight: document.querySelector("#spriteHeight"),
   exportCols: document.querySelector("#exportCols"),
   applySettings: document.querySelector("#applySettings"),
   projectStatus: document.querySelector("#projectStatus"),
@@ -116,13 +120,16 @@ function readSettings() {
     rows: clampNumber(els.gridRows.value, 1, 64, state.rows),
     tileWidth: clampNumber(els.tileWidth.value, 8, 1024, state.tileWidth),
     tileHeight: clampNumber(els.tileHeight.value, 8, 1024, state.tileHeight),
+    spriteWidth: clampNumber(els.spriteWidth.value, 8, 2048, state.spriteWidth),
+    spriteHeight: clampNumber(els.spriteHeight.value, 8, 2048, state.spriteHeight),
     exportCols: clampNumber(els.exportCols.value, 1, 64, state.exportCols)
   };
 }
 
 function applySettings() {
   const next = readSettings();
-  const resolutionChanged = next.tileWidth !== state.tileWidth || next.tileHeight !== state.tileHeight;
+  const resolutionChanged = next.spriteWidth !== state.spriteWidth || next.spriteHeight !== state.spriteHeight;
+  const gridScaleChanged = next.tileWidth !== state.tileWidth || next.tileHeight !== state.tileHeight;
   const gridChanged = next.cols !== state.cols || next.rows !== state.rows;
 
   Object.assign(state, next);
@@ -130,6 +137,8 @@ function applySettings() {
   els.gridRows.value = state.rows;
   els.tileWidth.value = state.tileWidth;
   els.tileHeight.value = state.tileHeight;
+  els.spriteWidth.value = state.spriteWidth;
+  els.spriteHeight.value = state.spriteHeight;
   els.exportCols.value = state.exportCols;
 
   if (resolutionChanged) {
@@ -138,7 +147,7 @@ function applySettings() {
     state.layers.forEach((layer) => layer.placements.clear());
     tileCounter = 1;
     setStatus("Tile size changed. Existing tiles were cleared so new crops match the export size.");
-  } else if (gridChanged) {
+  } else if (gridChanged || gridScaleChanged) {
     for (const layer of state.layers) {
       for (const [key, placement] of layer.placements) {
         if (placement.x >= state.cols || placement.y >= state.rows) {
@@ -190,7 +199,7 @@ function resizeGridCanvas() {
 }
 
 function getGridPadding() {
-  return Math.max(32, Math.ceil(Math.max(state.tileWidth, state.tileHeight) * 0.35));
+  return Math.max(32, Math.ceil(Math.max(state.tileWidth, state.spriteHeight) * 0.35));
 }
 
 function cellCenter(x, y) {
@@ -238,6 +247,18 @@ function drawDiamond(ctx, x, y, options = {}) {
   }
 }
 
+function tileDrawRect(tile, cell) {
+  const center = cellCenter(cell.x, cell.y);
+  const width = tile.width || tile.image.naturalWidth || state.spriteWidth;
+  const height = tile.height || tile.image.naturalHeight || state.spriteHeight;
+  return {
+    x: center.x - width / 2,
+    y: center.y + state.tileHeight / 2 - height,
+    width,
+    height
+  };
+}
+
 function renderGrid() {
   gridCtx.clearRect(0, 0, els.gridCanvas.width, els.gridCanvas.height);
   gridCtx.fillStyle = cssVar("--canvas-bg");
@@ -261,14 +282,8 @@ function renderGrid() {
     for (const placement of sortedLayerPlacements(layer)) {
       const tile = state.tiles.find((item) => item.id === placement.tileId);
       if (!tile) continue;
-      const center = cellCenter(placement.x, placement.y);
-      gridCtx.drawImage(
-        tile.image,
-        center.x - state.tileWidth / 2,
-        center.y - state.tileHeight / 2,
-        state.tileWidth,
-        state.tileHeight
-      );
+      const rect = tileDrawRect(tile, placement);
+      gridCtx.drawImage(tile.image, rect.x, rect.y, rect.width, rect.height);
     }
   }
 }
@@ -405,7 +420,9 @@ function addTileFromCanvas(canvas, name) {
         id: globalThis.crypto && crypto.randomUUID ? crypto.randomUUID() : `tile-${Date.now()}-${tileCounter}`,
         name,
         url,
-        image
+        image,
+        width: canvas.width,
+        height: canvas.height
       };
       tileCounter += 1;
       state.tiles.push(tile);
@@ -429,10 +446,10 @@ async function importSpritesheet(file) {
   if (!file) return;
   try {
     const { image, url } = await readImageFile(file);
-    const columns = Math.floor(image.width / state.tileWidth);
-    const rows = Math.floor(image.height / state.tileHeight);
+    const columns = Math.floor(image.width / state.spriteWidth);
+    const rows = Math.floor(image.height / state.spriteHeight);
     if (columns < 1 || rows < 1) {
-      setStatus(`Sprite sheet is smaller than ${state.tileWidth}x${state.tileHeight}.`);
+      setStatus(`Sprite sheet is smaller than ${state.spriteWidth}x${state.spriteHeight}.`);
       URL.revokeObjectURL(url);
       return;
     }
@@ -442,21 +459,21 @@ async function importSpritesheet(file) {
     for (let row = 0; row < rows; row += 1) {
       for (let column = 0; column < columns; column += 1) {
         const tileCanvas = document.createElement("canvas");
-        tileCanvas.width = state.tileWidth;
-        tileCanvas.height = state.tileHeight;
+        tileCanvas.width = state.spriteWidth;
+        tileCanvas.height = state.spriteHeight;
         const tileCtx = tileCanvas.getContext("2d");
         tileCtx.imageSmoothingEnabled = false;
         tileCtx.clearRect(0, 0, tileCanvas.width, tileCanvas.height);
         tileCtx.drawImage(
           image,
-          column * state.tileWidth,
-          row * state.tileHeight,
-          state.tileWidth,
-          state.tileHeight,
+          column * state.spriteWidth,
+          row * state.spriteHeight,
+          state.spriteWidth,
+          state.spriteHeight,
           0,
           0,
-          state.tileWidth,
-          state.tileHeight
+          state.spriteWidth,
+          state.spriteHeight
         );
         if (!tileHasVisiblePixels(tileCanvas)) continue;
         await addTileFromCanvas(tileCanvas, `${baseName}_${row + 1}_${column + 1}.png`);
@@ -467,7 +484,7 @@ async function importSpritesheet(file) {
     URL.revokeObjectURL(url);
     renderPalette();
     updateStats();
-    setStatus(`Imported ${imported} tiles from ${file.name} using ${state.tileWidth}x${state.tileHeight} cells.`);
+    setStatus(`Imported ${imported} tiles from ${file.name} using ${state.spriteWidth}x${state.spriteHeight} sprite cells.`);
   } catch (error) {
     console.error(error);
     setStatus(`Could not import ${file.name}.`);
@@ -509,7 +526,7 @@ async function processNextCrop() {
 }
 
 function setupCropCanvas() {
-  const aspect = state.tileWidth / state.tileHeight;
+  const aspect = state.spriteWidth / state.spriteHeight;
   let width = 560;
   let height = width / aspect;
   if (height > 380) {
@@ -541,7 +558,7 @@ function cropScaleForMode(mode) {
   if (mode === "free") return Math.max(scaleX, scaleY);
   const sourceScale = Number.parseFloat(mode);
   if (!Number.isFinite(sourceScale) || sourceScale <= 0) return Math.max(scaleX, scaleY);
-  return els.cropCanvas.width / (state.tileWidth / sourceScale);
+  return els.cropCanvas.width / (state.spriteWidth / sourceScale);
 }
 
 function syncCropControls() {
@@ -614,8 +631,8 @@ function drawCrop() {
 function saveCurrentCrop() {
   if (!cropState) return;
   const output = document.createElement("canvas");
-  output.width = state.tileWidth;
-  output.height = state.tileHeight;
+  output.width = state.spriteWidth;
+  output.height = state.spriteHeight;
   const outputCtx = output.getContext("2d");
   outputCtx.imageSmoothingEnabled = false;
 
@@ -633,7 +650,9 @@ function saveCurrentCrop() {
       id: globalThis.crypto && crypto.randomUUID ? crypto.randomUUID() : `tile-${Date.now()}-${tileCounter}`,
       name: cropState.file.name || `Tile ${tileCounter}`,
       url,
-      image
+      image,
+      width: output.width,
+      height: output.height
     };
     tileCounter += 1;
     state.tiles.push(tile);
@@ -643,7 +662,7 @@ function saveCurrentCrop() {
     els.cropDialog.close();
     renderPalette();
     updateStats();
-    setStatus(`Added ${tile.name} at ${state.tileWidth}x${state.tileHeight}.`);
+    setStatus(`Added ${tile.name} at ${state.spriteWidth}x${state.spriteHeight}.`);
     processNextCrop();
   };
   image.src = url;
@@ -763,8 +782,8 @@ function exportSpritesheet() {
   const columns = Math.max(1, Math.min(state.exportCols, placements.length));
   const rows = Math.ceil(placements.length / columns);
   const sheet = document.createElement("canvas");
-  sheet.width = columns * state.tileWidth;
-  sheet.height = rows * state.tileHeight;
+  sheet.width = columns * state.spriteWidth;
+  sheet.height = rows * state.spriteHeight;
   const ctx = sheet.getContext("2d");
   ctx.clearRect(0, 0, sheet.width, sheet.height);
   ctx.imageSmoothingEnabled = false;
@@ -774,11 +793,11 @@ function exportSpritesheet() {
     if (!tile) return;
     const x = index % columns;
     const y = Math.floor(index / columns);
-    ctx.drawImage(tile.image, x * state.tileWidth, y * state.tileHeight, state.tileWidth, state.tileHeight);
+    ctx.drawImage(tile.image, x * state.spriteWidth, y * state.spriteHeight, state.spriteWidth, state.spriteHeight);
   });
 
   const link = document.createElement("a");
-  link.download = `godot-tileset-${state.tileWidth}x${state.tileHeight}.png`;
+  link.download = `godot-tileset-${state.spriteWidth}x${state.spriteHeight}.png`;
   link.href = sheet.toDataURL("image/png");
   link.click();
   setStatus(`Exported ${placements.length} tiles as ${sheet.width}x${sheet.height} PNG.`);
@@ -804,14 +823,8 @@ function exportMapImage() {
   placements.forEach((placement) => {
     const tile = state.tiles.find((item) => item.id === placement.tileId);
     if (!tile) return;
-    const center = cellCenter(placement.x, placement.y);
-    ctx.drawImage(
-      tile.image,
-      center.x - state.tileWidth / 2,
-      center.y - state.tileHeight / 2,
-      state.tileWidth,
-      state.tileHeight
-    );
+    const rect = tileDrawRect(tile, placement);
+    ctx.drawImage(tile.image, rect.x, rect.y, rect.width, rect.height);
   });
 
   const link = document.createElement("a");
@@ -937,6 +950,8 @@ window.__tileBuilderDebug = {
       rows: state.rows,
       tileWidth: state.tileWidth,
       tileHeight: state.tileHeight,
+      spriteWidth: state.spriteWidth,
+      spriteHeight: state.spriteHeight,
       exportCols: state.exportCols,
       viewerScale: state.viewerScale,
       placedCount: placedTileCount(),

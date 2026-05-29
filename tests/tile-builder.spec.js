@@ -139,11 +139,21 @@ async function openApp(page) {
   await expect(page.locator("#gridCanvas")).toBeVisible();
 }
 
-async function setProject(page, { cols = 4, rows = 3, tileWidth = 64, tileHeight = 32, exportCols = 2 } = {}) {
+async function setProject(page, {
+  cols = 4,
+  rows = 3,
+  tileWidth = 64,
+  tileHeight = 32,
+  spriteWidth = tileWidth,
+  spriteHeight = tileHeight,
+  exportCols = 2
+} = {}) {
   await page.locator("#gridCols").fill(String(cols));
   await page.locator("#gridRows").fill(String(rows));
   await page.locator("#tileWidth").fill(String(tileWidth));
   await page.locator("#tileHeight").fill(String(tileHeight));
+  await page.locator("#spriteWidth").fill(String(spriteWidth));
+  await page.locator("#spriteHeight").fill(String(spriteHeight));
   await page.locator("#exportCols").fill(String(exportCols));
   await page.getByRole("button", { name: "Apply Settings" }).click();
 }
@@ -447,7 +457,7 @@ test("imports a spritesheet, paints layered tiles, and exports an oriented map P
 
   await expect(page.locator(".tile-card")).toHaveCount(2);
   await expect(page.locator("#projectStatus")).toHaveText(
-    "Imported 2 tiles from terrain-sheet.png using 64x32 cells."
+    "Imported 2 tiles from terrain-sheet.png using 64x32 sprite cells."
   );
 
   await page.locator(".tile-card", { hasText: "terrain-sheet_1_1.png" }).click();
@@ -495,6 +505,63 @@ test("imports a spritesheet, paints layered tiles, and exports an oriented map P
   expect(inspected.width).toBeGreaterThan(0);
   expect(inspected.height).toBeGreaterThan(0);
   expect(inspected.sample[2]).toBeGreaterThan(inspected.sample[0]);
+});
+
+test("imports 128px sprites onto a 128x64 isometric grid without splitting cells", async ({ page }) => {
+  await openApp(page);
+  await setProject(page, {
+    cols: 3,
+    rows: 3,
+    tileWidth: 128,
+    tileHeight: 64,
+    spriteWidth: 128,
+    spriteHeight: 128,
+    exportCols: 2
+  });
+
+  const sheet = createTileGridPng(128, 128, [[[255, 0, 0, 255], [0, 0, 255, 255]]]);
+  await page.locator("#sheetFileInput").setInputFiles({
+    name: "ground-terrain.png",
+    mimeType: "image/png",
+    buffer: sheet
+  });
+
+  await expect(page.locator(".tile-card")).toHaveCount(2);
+  await expect(page.locator("#projectStatus")).toHaveText(
+    "Imported 2 tiles from ground-terrain.png using 128x128 sprite cells."
+  );
+
+  await page.locator(".tile-card", { hasText: "ground-terrain_1_2.png" }).click();
+  await clickCell(page, 1, 1);
+  await page.getByRole("button", { name: "Export Map PNG" }).click();
+
+  const exportInfo = await page.waitForFunction(() => window.__lastTileDownload);
+  const exported = await exportInfo.jsonValue();
+  const inspected = await page.evaluate(async (href) => {
+    const image = new Image();
+    image.src = href;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0);
+    const state = window.__tileBuilderDebug.getState();
+    const pad = Math.max(32, Math.ceil(Math.max(state.tileWidth, state.spriteHeight) * 0.35));
+    const centerX = pad + (state.rows - 1) * state.tileWidth / 2 + state.tileWidth / 2;
+    const centerY = pad + state.tileHeight / 2 + (1 + 1) * state.tileHeight / 2;
+    return {
+      grid: [state.tileWidth, state.tileHeight],
+      sprite: [state.spriteWidth, state.spriteHeight],
+      topSample: [...ctx.getImageData(centerX, centerY + state.tileHeight / 2 - state.spriteHeight + 4, 1, 1).data],
+      bottomSample: [...ctx.getImageData(centerX, centerY + state.tileHeight / 2 - 4, 1, 1).data]
+    };
+  }, exported.href);
+
+  expect(inspected.grid).toEqual([128, 64]);
+  expect(inspected.sprite).toEqual([128, 128]);
+  expect(inspected.topSample[2]).toBeGreaterThan(inspected.topSample[0]);
+  expect(inspected.bottomSample[2]).toBeGreaterThan(inspected.bottomSample[0]);
 });
 
 test("batch terrain CLI crops directional tiles and reports missing terrain variants", async () => {
