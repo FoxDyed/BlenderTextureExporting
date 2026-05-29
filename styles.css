@@ -211,6 +211,18 @@ button:focus-visible {
   background: var(--accent-soft);
 }
 
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
 .tool-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -523,6 +535,12 @@ button:focus-visible {
     padding: 12px;
   }
 
+  .header-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
   .app-header h1 {
     font-size: 1.15rem;
   }
@@ -537,6 +555,13 @@ button:focus-visible {
   .tool-button,
   .file-picker span {
     padding: 8px 10px;
+  }
+
+  .header-actions .primary-button,
+  .header-actions .secondary-button {
+    padding: 7px 6px;
+    font-size: 0.72rem;
+    line-height: 1.15;
   }
 
   .control-panel {

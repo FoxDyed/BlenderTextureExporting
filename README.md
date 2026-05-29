@@ -20,6 +20,30 @@ Live site: <https://foxdyed.github.io/BlenderTextureExporting/>
 
 Open `index.html` in a browser. No build step or server is required.
 
+## Batch Terrain Sets
+
+For asset packs that already use a directional naming pattern such as
+`Ground A1_N.png`, `Ground A1_E.png`, `Ground A1_S.png`, and `Ground A1_W.png`,
+use the CLI helper to crop the alpha bounds, build a Godot-ready sheet, and
+write a missing-parts report:
+
+```bash
+npm run build:terrain-set -- --source "C:\path\to\Environment" --set "Ground A1"
+```
+
+By default this creates `<source>\Ground A1 edited` with cropped sprites, a
+one-row terrain sheet, and `missing_tiles_report.md`.
+
+To turn every directional `Ground` tile into one terrain sheet with fixed
+Godot-friendly cells:
+
+```bash
+npm run build:terrain-set -- --source "C:\path\to\Environment" --prefix Ground --tile-size 128x128
+```
+
+This creates `<source>\Ground edited` with every cropped sprite, a full terrain
+sheet, `ground_terrain_sheet_map.csv`, and `missing_tiles_report.md`.
+
 ## Tests
 
 Install dependencies and run the Playwright suite:

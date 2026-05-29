@@ -1,4 +1,7 @@
 const { test, expect } = require("playwright/test");
+const childProcess = require("child_process");
+const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const zlib = require("zlib");
 
@@ -77,10 +80,57 @@ function createVerticalSplitPng(width, height, topColor, bottomColor) {
   ]);
 }
 
+function createTileGridPng(tileWidth, tileHeight, colors) {
+  const columns = colors[0].length;
+  const rows = colors.length;
+  const width = columns * tileWidth;
+  const height = rows * tileHeight;
+  const signature = Buffer.from("89504e470d0a1a0a", "hex");
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+
+  const stride = 1 + width * 4;
+  const rawPixels = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y += 1) {
+    const rowStart = y * stride;
+    rawPixels[rowStart] = 0;
+    for (let x = 0; x < width; x += 1) {
+      const color = colors[Math.floor(y / tileHeight)][Math.floor(x / tileWidth)];
+      const pixelStart = rowStart + 1 + x * 4;
+      rawPixels[pixelStart] = color[0];
+      rawPixels[pixelStart + 1] = color[1];
+      rawPixels[pixelStart + 2] = color[2];
+      rawPixels[pixelStart + 3] = color[3];
+    }
+  }
+
+  return Buffer.concat([
+    signature,
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", zlib.deflateSync(rawPixels)),
+    pngChunk("IEND", Buffer.alloc(0))
+  ]);
+}
+
+function readPngSize(buffer) {
+  expect(buffer.subarray(0, 8)).toEqual(Buffer.from("89504e470d0a1a0a", "hex"));
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  };
+}
+
 const pngs = {
   red: createSolidPng([255, 0, 0, 255]),
   blue: createSolidPng([0, 0, 255, 255]),
-  splitTall: createVerticalSplitPng(128, 256, [255, 0, 0, 255], [0, 0, 255, 255])
+  splitTall: createVerticalSplitPng(128, 256, [255, 0, 0, 255], [0, 0, 255, 255]),
+  twoTileSheet: createTileGridPng(64, 32, [[[255, 0, 0, 255], [0, 0, 255, 255]]])
 };
 
 async function openApp(page) {
@@ -114,7 +164,7 @@ async function addTile(page, name, buffer) {
 
 async function clickCell(page, x, y) {
   await page.locator("#gridCanvas").scrollIntoViewIfNeeded();
-  const point = await page.locator("#gridCanvas").evaluate((canvas, cell) => {
+  await page.locator("#gridCanvas").evaluate((canvas, cell) => {
     const state = window.__tileBuilderDebug.getState();
     const rect = canvas.getBoundingClientRect();
     const pad = Math.max(32, Math.ceil(Math.max(state.tileWidth, state.tileHeight) * 0.35));
@@ -122,14 +172,16 @@ async function clickCell(page, x, y) {
     const halfH = state.tileHeight / 2;
     const canvasX = pad + (state.rows - 1) * halfW + halfW + (cell.x - cell.y) * halfW;
     const canvasY = pad + halfH + (cell.x + cell.y) * halfH;
+    const clientX = rect.left + (canvasX / canvas.width) * rect.width;
+    const clientY = rect.top + (canvasY / canvas.height) * rect.height;
 
-    return {
-      x: rect.left + (canvasX / canvas.width) * rect.width,
-      y: rect.top + (canvasY / canvas.height) * rect.height
-    };
+    canvas.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY
+    }));
   }, { x, y });
-
-  await page.mouse.click(point.x, point.y);
 }
 
 async function captureExport(page) {
@@ -381,4 +433,140 @@ test("exports placed tiles as a Y-then-X sorted packed PNG", async ({ page }) =>
   expect(inspected.height).toBe(32);
   expect(inspected.first[0]).toBeGreaterThan(inspected.first[2]);
   expect(inspected.second[2]).toBeGreaterThan(inspected.second[0]);
+});
+
+test("imports a spritesheet, paints layered tiles, and exports an oriented map PNG", async ({ page }) => {
+  await openApp(page);
+  await setProject(page, { cols: 3, rows: 3, tileWidth: 64, tileHeight: 32, exportCols: 2 });
+
+  await page.locator("#sheetFileInput").setInputFiles({
+    name: "terrain-sheet.png",
+    mimeType: "image/png",
+    buffer: pngs.twoTileSheet
+  });
+
+  await expect(page.locator(".tile-card")).toHaveCount(2);
+  await expect(page.locator("#projectStatus")).toHaveText(
+    "Imported 2 tiles from terrain-sheet.png using 64x32 cells."
+  );
+
+  await page.locator(".tile-card", { hasText: "terrain-sheet_1_1.png" }).click();
+  await clickCell(page, 1, 1);
+  await page.getByRole("button", { name: "Add Layer" }).click();
+  await expect(page.locator("#layerSelect option")).toHaveCount(2);
+  await page.locator("#layerSelect").selectOption({ label: "Layer 2 (0)" });
+  expect(await page.evaluate(() => window.__tileBuilderDebug.getState())).toMatchObject({
+    activeLayerName: "Layer 2",
+    layerPlacements: [
+      { name: "Layer 1", count: 1 },
+      { name: "Layer 2", count: 0 }
+    ]
+  });
+  await page.locator(".tile-card", { hasText: "terrain-sheet_1_2.png" }).click();
+  await clickCell(page, 1, 1);
+  await expect(page.locator("#placedCount")).toHaveText("2");
+
+  await page.getByRole("button", { name: "Export Map PNG" }).click();
+  const exportInfo = await page.waitForFunction(() => window.__lastTileDownload);
+  const exported = await exportInfo.jsonValue();
+  expect(exported.download).toBe("isometric-map-3x3.png");
+  await expect(page.locator("#projectStatus")).toHaveText(/Exported map as .* from 2 visible tiles\./);
+
+  const inspected = await page.evaluate(async (href) => {
+    const image = new Image();
+    image.src = href;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0);
+    const state = window.__tileBuilderDebug.getState();
+    const pad = Math.max(32, Math.ceil(Math.max(state.tileWidth, state.tileHeight) * 0.35));
+    const sampleX = pad + (state.rows - 1) * state.tileWidth / 2 + state.tileWidth / 2;
+    const sampleY = pad + state.tileHeight / 2 + (1 + 1) * state.tileHeight / 2;
+    return {
+      width: image.width,
+      height: image.height,
+      sample: [...ctx.getImageData(sampleX, sampleY, 1, 1).data]
+    };
+  }, exported.href);
+
+  expect(inspected.width).toBeGreaterThan(0);
+  expect(inspected.height).toBeGreaterThan(0);
+  expect(inspected.sample[2]).toBeGreaterThan(inspected.sample[0]);
+});
+
+test("batch terrain CLI crops directional tiles and reports missing terrain variants", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "terrain-set-"));
+  try {
+    for (const direction of ["N", "E", "S", "W"]) {
+      fs.writeFileSync(path.join(tempRoot, `Ground A1_${direction}.png`), pngs.red);
+      fs.writeFileSync(path.join(tempRoot, `Ground A3_${direction}.png`), pngs.blue);
+    }
+
+    childProcess.execFileSync(
+      process.execPath,
+      [path.resolve(__dirname, "..", "tools", "build-terrain-set.js"), "--source", tempRoot, "--set", "Ground A1"],
+      { encoding: "utf8" }
+    );
+
+    const outDir = path.join(tempRoot, "Ground A1 edited");
+    for (const direction of ["n", "e", "s", "w"]) {
+      expect(fs.existsSync(path.join(outDir, `ground_a1_${direction}.png`))).toBe(true);
+    }
+
+    expect(readPngSize(fs.readFileSync(path.join(outDir, "ground_a1_terrain_sheet.png")))).toEqual({
+      width: 4,
+      height: 1
+    });
+    expect(fs.readFileSync(path.join(outDir, "missing_tiles_report.md"), "utf8")).toContain(
+      "Missing numeric variant(s): 2"
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("batch terrain CLI builds a full prefix sheet with fixed-size terrain cells", async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "terrain-prefix-"));
+  try {
+    for (const direction of ["N", "E", "S", "W"]) {
+      fs.writeFileSync(path.join(tempRoot, `Ground A1_${direction}.png`), pngs.red);
+      fs.writeFileSync(path.join(tempRoot, `Ground A3_${direction}.png`), pngs.blue);
+      fs.writeFileSync(path.join(tempRoot, `Ground B1_${direction}.png`), pngs.red);
+    }
+
+    childProcess.execFileSync(
+      process.execPath,
+      [
+        path.resolve(__dirname, "..", "tools", "build-terrain-set.js"),
+        "--source",
+        tempRoot,
+        "--prefix",
+        "Ground",
+        "--tile-size",
+        "128x128"
+      ],
+      { encoding: "utf8" }
+    );
+
+    const outDir = path.join(tempRoot, "Ground edited");
+    expect(readPngSize(fs.readFileSync(path.join(outDir, "ground_a1_n.png")))).toEqual({
+      width: 128,
+      height: 128
+    });
+    expect(readPngSize(fs.readFileSync(path.join(outDir, "ground_terrain_sheet.png")))).toEqual({
+      width: 1536,
+      height: 256
+    });
+    expect(fs.readFileSync(path.join(outDir, "ground_terrain_sheet_map.csv"), "utf8")).toContain(
+      "Ground_A3_W,ground_a3_w.png"
+    );
+    expect(fs.readFileSync(path.join(outDir, "missing_tiles_report.md"), "utf8")).toContain(
+      "Ground A2: missing entire variant"
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });

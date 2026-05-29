@@ -4,6 +4,7 @@
   "private": true,
   "description": "Static GitHub Pages tool for building Godot-ready isometric tile spritesheets.",
   "scripts": {
+    "build:terrain-set": "node tools/build-terrain-set.js",
     "install:browsers": "playwright install chromium",
     "test": "playwright test",
     "test:ui": "playwright test --ui"

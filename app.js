@@ -7,7 +7,15 @@ const state = {
   tiles: [],
   selectedTileId: null,
   tool: "paint",
-  placements: new Map(),
+  layers: [
+    {
+      id: "layer-1",
+      name: "Layer 1",
+      visible: true,
+      placements: new Map()
+    }
+  ],
+  activeLayerId: "layer-1",
   hoverCell: null,
   viewerScale: 1,
   userSetViewerScale: false
@@ -24,12 +32,18 @@ const els = {
   applySettings: document.querySelector("#applySettings"),
   projectStatus: document.querySelector("#projectStatus"),
   fileInput: document.querySelector("#fileInput"),
+  sheetFileInput: document.querySelector("#sheetFileInput"),
   palette: document.querySelector("#palette"),
   paintTool: document.querySelector("#paintTool"),
   eraseTool: document.querySelector("#eraseTool"),
   clearGrid: document.querySelector("#clearGrid"),
   themeToggle: document.querySelector("#themeToggle"),
   exportButton: document.querySelector("#exportButton"),
+  exportMapButton: document.querySelector("#exportMapButton"),
+  layerSelect: document.querySelector("#layerSelect"),
+  addLayer: document.querySelector("#addLayer"),
+  deleteLayer: document.querySelector("#deleteLayer"),
+  layerVisible: document.querySelector("#layerVisible"),
   placedCount: document.querySelector("#placedCount"),
   selectedTileName: document.querySelector("#selectedTileName"),
   hoverCell: document.querySelector("#hoverCell"),
@@ -71,6 +85,31 @@ function placementKey(x, y) {
   return `${x},${y}`;
 }
 
+function activeLayer() {
+  return state.layers.find((layer) => layer.id === state.activeLayerId) || state.layers[0];
+}
+
+function visibleLayers() {
+  return state.layers.filter((layer) => layer.visible);
+}
+
+function sortedLayerPlacements(layer) {
+  return [...layer.placements.values()].sort((a, b) => {
+    if (a.y !== b.y) return a.y - b.y;
+    return a.x - b.x;
+  });
+}
+
+function placedTileCount() {
+  return state.layers.reduce((sum, layer) => sum + layer.placements.size, 0);
+}
+
+function allPlacementsSorted() {
+  return state.layers.flatMap((layer, layerIndex) => {
+    return sortedLayerPlacements(layer).map((placement) => ({ ...placement, layerIndex }));
+  });
+}
+
 function readSettings() {
   return {
     cols: clampNumber(els.gridCols.value, 1, 64, state.cols),
@@ -96,13 +135,15 @@ function applySettings() {
   if (resolutionChanged) {
     state.tiles = [];
     state.selectedTileId = null;
-    state.placements.clear();
+    state.layers.forEach((layer) => layer.placements.clear());
     tileCounter = 1;
     setStatus("Tile size changed. Existing tiles were cleared so new crops match the export size.");
   } else if (gridChanged) {
-    for (const [key, placement] of state.placements) {
-      if (placement.x >= state.cols || placement.y >= state.rows) {
-        state.placements.delete(key);
+    for (const layer of state.layers) {
+      for (const [key, placement] of layer.placements) {
+        if (placement.x >= state.cols || placement.y >= state.rows) {
+          layer.placements.delete(key);
+        }
       }
     }
     setStatus("Grid settings applied.");
@@ -111,6 +152,7 @@ function applySettings() {
   }
 
   renderPalette();
+  renderLayers();
   resizeGridCanvas();
   renderGrid();
   updateViewerZoom();
@@ -215,22 +257,19 @@ function renderGrid() {
     });
   }
 
-  const sortedPlacements = [...state.placements.values()].sort((a, b) => {
-    if (a.y !== b.y) return a.y - b.y;
-    return a.x - b.x;
-  });
-
-  for (const placement of sortedPlacements) {
-    const tile = state.tiles.find((item) => item.id === placement.tileId);
-    if (!tile) continue;
-    const center = cellCenter(placement.x, placement.y);
-    gridCtx.drawImage(
-      tile.image,
-      center.x - state.tileWidth / 2,
-      center.y - state.tileHeight / 2,
-      state.tileWidth,
-      state.tileHeight
-    );
+  for (const layer of visibleLayers()) {
+    for (const placement of sortedLayerPlacements(layer)) {
+      const tile = state.tiles.find((item) => item.id === placement.tileId);
+      if (!tile) continue;
+      const center = cellCenter(placement.x, placement.y);
+      gridCtx.drawImage(
+        tile.image,
+        center.x - state.tileWidth / 2,
+        center.y - state.tileHeight / 2,
+        state.tileWidth,
+        state.tileHeight
+      );
+    }
   }
 }
 
@@ -270,13 +309,29 @@ function renderPalette() {
   }
 }
 
+function renderLayers() {
+  els.layerSelect.replaceChildren();
+  for (const layer of state.layers) {
+    const option = document.createElement("option");
+    option.value = layer.id;
+    option.textContent = `${layer.name} (${layer.placements.size})`;
+    els.layerSelect.append(option);
+  }
+
+  const layer = activeLayer();
+  state.activeLayerId = layer.id;
+  els.layerSelect.value = layer.id;
+  els.layerVisible.checked = layer.visible;
+  els.deleteLayer.disabled = state.layers.length === 1;
+}
+
 function updateToolButtons() {
   els.paintTool.classList.toggle("is-active", state.tool === "paint");
   els.eraseTool.classList.toggle("is-active", state.tool === "erase");
 }
 
 function updateStats() {
-  els.placedCount.textContent = String(state.placements.size);
+  els.placedCount.textContent = String(placedTileCount());
   const selected = state.tiles.find((tile) => tile.id === state.selectedTileId);
   els.selectedTileName.textContent = selected ? selected.name : "None";
 }
@@ -339,6 +394,84 @@ async function enqueueFiles(files) {
   const pngFiles = [...files].filter((file) => file.type === "image/png" || file.name.toLowerCase().endsWith(".png"));
   pendingFiles.push(...pngFiles);
   if (!cropState) processNextCrop();
+}
+
+function addTileFromCanvas(canvas, name) {
+  return new Promise((resolve) => {
+    const url = canvas.toDataURL("image/png");
+    const image = new Image();
+    image.onload = () => {
+      const tile = {
+        id: globalThis.crypto && crypto.randomUUID ? crypto.randomUUID() : `tile-${Date.now()}-${tileCounter}`,
+        name,
+        url,
+        image
+      };
+      tileCounter += 1;
+      state.tiles.push(tile);
+      state.selectedTileId = tile.id;
+      resolve(tile);
+    };
+    image.src = url;
+  });
+}
+
+function tileHasVisiblePixels(canvas) {
+  const ctx = canvas.getContext("2d");
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  for (let index = 3; index < pixels.length; index += 4) {
+    if (pixels[index] > 0) return true;
+  }
+  return false;
+}
+
+async function importSpritesheet(file) {
+  if (!file) return;
+  try {
+    const { image, url } = await readImageFile(file);
+    const columns = Math.floor(image.width / state.tileWidth);
+    const rows = Math.floor(image.height / state.tileHeight);
+    if (columns < 1 || rows < 1) {
+      setStatus(`Sprite sheet is smaller than ${state.tileWidth}x${state.tileHeight}.`);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const baseName = file.name.replace(/\.png$/i, "");
+    let imported = 0;
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const tileCanvas = document.createElement("canvas");
+        tileCanvas.width = state.tileWidth;
+        tileCanvas.height = state.tileHeight;
+        const tileCtx = tileCanvas.getContext("2d");
+        tileCtx.imageSmoothingEnabled = false;
+        tileCtx.clearRect(0, 0, tileCanvas.width, tileCanvas.height);
+        tileCtx.drawImage(
+          image,
+          column * state.tileWidth,
+          row * state.tileHeight,
+          state.tileWidth,
+          state.tileHeight,
+          0,
+          0,
+          state.tileWidth,
+          state.tileHeight
+        );
+        if (!tileHasVisiblePixels(tileCanvas)) continue;
+        await addTileFromCanvas(tileCanvas, `${baseName}_${row + 1}_${column + 1}.png`);
+        imported += 1;
+      }
+    }
+
+    URL.revokeObjectURL(url);
+    renderPalette();
+    updateStats();
+    setStatus(`Imported ${imported} tiles from ${file.name} using ${state.tileWidth}x${state.tileHeight} cells.`);
+  } catch (error) {
+    console.error(error);
+    setStatus(`Could not import ${file.name}.`);
+  }
 }
 
 async function processNextCrop() {
@@ -550,31 +683,77 @@ function handleGridClick(event) {
   if (!cell) return;
 
   const key = placementKey(cell.x, cell.y);
+  const layer = activeLayer();
   if (state.tool === "erase") {
-    state.placements.delete(key);
+    layer.placements.delete(key);
   } else if (state.selectedTileId) {
-    state.placements.set(key, { x: cell.x, y: cell.y, tileId: state.selectedTileId });
+    layer.placements.set(key, { x: cell.x, y: cell.y, tileId: state.selectedTileId });
   } else {
     setStatus("Select a tile before painting the grid.");
     return;
   }
 
   renderGrid();
+  renderLayers();
   updateStats();
 }
 
 function clearGrid() {
-  state.placements.clear();
+  activeLayer().placements.clear();
+  renderGrid();
+  renderLayers();
+  updateStats();
+  setStatus(`${activeLayer().name} cleared.`);
+}
+
+function addLayer() {
+  const nextNumber = state.layers.length + 1;
+  const layer = {
+    id: globalThis.crypto && crypto.randomUUID ? crypto.randomUUID() : `layer-${Date.now()}-${nextNumber}`,
+    name: `Layer ${nextNumber}`,
+    visible: true,
+    placements: new Map()
+  };
+  state.layers.push(layer);
+  state.activeLayerId = layer.id;
+  renderLayers();
   renderGrid();
   updateStats();
-  setStatus("Grid cleared.");
+  setStatus(`${layer.name} added.`);
+}
+
+function deleteActiveLayer() {
+  if (state.layers.length === 1) {
+    setStatus("At least one layer is required.");
+    return;
+  }
+  const layer = activeLayer();
+  const index = state.layers.findIndex((item) => item.id === layer.id);
+  state.layers.splice(index, 1);
+  state.activeLayerId = state.layers[Math.max(0, index - 1)].id;
+  renderLayers();
+  renderGrid();
+  updateStats();
+  setStatus(`${layer.name} deleted.`);
+}
+
+function setActiveLayer(layerId) {
+  if (!state.layers.some((layer) => layer.id === layerId)) return;
+  state.activeLayerId = layerId;
+  renderLayers();
+  setStatus(`${activeLayer().name} selected.`);
+}
+
+function setActiveLayerVisibility(visible) {
+  const layer = activeLayer();
+  layer.visible = visible;
+  renderLayers();
+  renderGrid();
+  setStatus(`${layer.name} ${visible ? "shown" : "hidden"}.`);
 }
 
 function exportSpritesheet() {
-  const placements = [...state.placements.values()].sort((a, b) => {
-    if (a.y !== b.y) return a.y - b.y;
-    return a.x - b.x;
-  });
+  const placements = allPlacementsSorted();
 
   if (placements.length === 0) {
     setStatus("Place at least one tile before exporting.");
@@ -603,6 +782,43 @@ function exportSpritesheet() {
   link.href = sheet.toDataURL("image/png");
   link.click();
   setStatus(`Exported ${placements.length} tiles as ${sheet.width}x${sheet.height} PNG.`);
+}
+
+function exportMapImage() {
+  const placements = visibleLayers().flatMap((layer, layerIndex) => {
+    return sortedLayerPlacements(layer).map((placement) => ({ ...placement, layerIndex }));
+  });
+
+  if (placements.length === 0) {
+    setStatus("Paint at least one visible tile before exporting the map.");
+    return;
+  }
+
+  const map = document.createElement("canvas");
+  map.width = els.gridCanvas.width;
+  map.height = els.gridCanvas.height;
+  const ctx = map.getContext("2d");
+  ctx.clearRect(0, 0, map.width, map.height);
+  ctx.imageSmoothingEnabled = false;
+
+  placements.forEach((placement) => {
+    const tile = state.tiles.find((item) => item.id === placement.tileId);
+    if (!tile) return;
+    const center = cellCenter(placement.x, placement.y);
+    ctx.drawImage(
+      tile.image,
+      center.x - state.tileWidth / 2,
+      center.y - state.tileHeight / 2,
+      state.tileWidth,
+      state.tileHeight
+    );
+  });
+
+  const link = document.createElement("a");
+  link.download = `isometric-map-${state.cols}x${state.rows}.png`;
+  link.href = map.toDataURL("image/png");
+  link.click();
+  setStatus(`Exported map as ${map.width}x${map.height} PNG from ${placements.length} visible tiles.`);
 }
 
 function handleCropZoom() {
@@ -634,6 +850,10 @@ els.fileInput.addEventListener("change", (event) => {
   enqueueFiles(event.target.files);
   event.target.value = "";
 });
+els.sheetFileInput.addEventListener("change", (event) => {
+  importSpritesheet(event.target.files[0]);
+  event.target.value = "";
+});
 els.paintTool.addEventListener("click", () => {
   state.tool = "paint";
   updateToolButtons();
@@ -647,6 +867,11 @@ els.themeToggle.addEventListener("click", () => {
   applyTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
 });
 els.exportButton.addEventListener("click", exportSpritesheet);
+els.exportMapButton.addEventListener("click", exportMapImage);
+els.layerSelect.addEventListener("change", () => setActiveLayer(els.layerSelect.value));
+els.addLayer.addEventListener("click", addLayer);
+els.deleteLayer.addEventListener("click", deleteActiveLayer);
+els.layerVisible.addEventListener("change", () => setActiveLayerVisibility(els.layerVisible.checked));
 els.zoomOut.addEventListener("click", () => stepViewerZoom(-1));
 els.zoomIn.addEventListener("click", () => stepViewerZoom(1));
 els.zoomReset.addEventListener("click", () => setViewerScale(1));
@@ -699,10 +924,11 @@ els.cropCanvas.addEventListener("pointercancel", () => {
 initializeTheme();
 resizeGridCanvas();
 renderPalette();
+renderLayers();
 renderGrid();
 applyResponsiveViewerScale();
 updateStats();
-setStatus("Ready. Add PNGs, crop them, then paint the isometric grid.");
+setStatus("Ready. Add PNGs or import a sprite sheet, then paint the layered isometric grid.");
 
 window.__tileBuilderDebug = {
   getState() {
@@ -713,7 +939,11 @@ window.__tileBuilderDebug = {
       tileHeight: state.tileHeight,
       exportCols: state.exportCols,
       viewerScale: state.viewerScale,
-      placedCount: state.placements.size,
+      placedCount: placedTileCount(),
+      layerCount: state.layers.length,
+      activeLayerId: state.activeLayerId,
+      activeLayerName: activeLayer().name,
+      layerPlacements: state.layers.map((layer) => ({ name: layer.name, count: layer.placements.size, visible: layer.visible })),
       selectedTileId: state.selectedTileId
     };
   }

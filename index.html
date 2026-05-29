@@ -14,6 +14,7 @@
       </div>
       <div class="header-actions">
         <button id="themeToggle" class="secondary-button" type="button" aria-pressed="false">Dark Mode</button>
+        <button id="exportMapButton" class="secondary-button" type="button">Export Map PNG</button>
         <button id="exportButton" class="primary-button" type="button">Export PNG</button>
       </div>
     </header>
@@ -54,11 +55,31 @@
             <span>Add PNGs</span>
             <input id="fileInput" type="file" accept="image/png" multiple>
           </label>
+          <label class="file-picker">
+            <span>Import Sprite Sheet</span>
+            <input id="sheetFileInput" type="file" accept="image/png">
+          </label>
           <div class="tool-row" role="group" aria-label="Grid tools">
             <button id="paintTool" class="tool-button is-active" type="button">Paint</button>
             <button id="eraseTool" class="tool-button" type="button">Erase</button>
           </div>
           <div id="palette" class="palette" aria-label="Tile palette"></div>
+        </section>
+
+        <section>
+          <h2>Layers</h2>
+          <label>
+            Active layer
+            <select id="layerSelect"></select>
+          </label>
+          <div class="tool-row" role="group" aria-label="Layer controls">
+            <button id="addLayer" class="secondary-button" type="button">Add Layer</button>
+            <button id="deleteLayer" class="secondary-button" type="button">Delete Layer</button>
+          </div>
+          <label class="checkbox-field">
+            <input id="layerVisible" type="checkbox" checked>
+            Visible
+          </label>
         </section>
 
         <section>
