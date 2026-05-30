@@ -480,6 +480,13 @@ button:focus-visible {
   gap: 12px;
 }
 
+.crop-size-tools {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(100px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
 .crop-align-tools {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -680,6 +687,15 @@ button:focus-visible {
     gap: 8px;
   }
 
+  .crop-size-tools {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .crop-size-tools .secondary-button {
+    grid-column: 1 / -1;
+  }
+
   .crop-align-tools {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -866,6 +882,15 @@ button:focus-visible {
   .crop-scale-tools {
     grid-template-columns: minmax(150px, 200px) minmax(0, 1fr);
     gap: 8px;
+  }
+
+  .crop-size-tools {
+    grid-template-columns: minmax(90px, 1fr) minmax(90px, 1fr) auto;
+    gap: 8px;
+  }
+
+  .crop-size-tools .secondary-button {
+    grid-column: auto;
   }
 
   .crop-align-tools {

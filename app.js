@@ -61,6 +61,9 @@ const els = {
   cropDialog: document.querySelector("#cropDialog"),
   cropTitle: document.querySelector("#cropTitle"),
   cropCanvas: document.querySelector("#cropCanvas"),
+  cropWidth: document.querySelector("#cropWidth"),
+  cropHeight: document.querySelector("#cropHeight"),
+  applyCropSize: document.querySelector("#applyCropSize"),
   cropScaleMode: document.querySelector("#cropScaleMode"),
   cropSourceInfo: document.querySelector("#cropSourceInfo"),
   alignTop: document.querySelector("#alignTop"),
@@ -539,6 +542,8 @@ async function processNextCrop() {
       file,
       image,
       sourceUrl: url,
+      outputWidth: state.spriteWidth,
+      outputHeight: state.spriteHeight,
       scale: 1,
       scaleMode: els.cropScaleMode.value,
       offsetX: 0,
@@ -550,6 +555,8 @@ async function processNextCrop() {
       startOffsetY: 0
     };
     els.cropTitle.textContent = file.name;
+    els.cropWidth.value = cropState.outputWidth;
+    els.cropHeight.value = cropState.outputHeight;
     setupCropCanvas();
     centerCropImage();
     els.cropDialog.showModal();
@@ -561,7 +568,7 @@ async function processNextCrop() {
 }
 
 function setupCropCanvas() {
-  const aspect = state.spriteWidth / state.spriteHeight;
+  const aspect = cropState ? cropState.outputWidth / cropState.outputHeight : state.spriteWidth / state.spriteHeight;
   let width = 560;
   let height = width / aspect;
   if (height > 380) {
@@ -570,6 +577,17 @@ function setupCropCanvas() {
   }
   els.cropCanvas.width = Math.max(180, Math.round(width));
   els.cropCanvas.height = Math.max(120, Math.round(height));
+}
+
+function applyCustomCropSize() {
+  if (!cropState) return;
+  cropState.outputWidth = clampNumber(els.cropWidth.value, 8, 2048, cropState.outputWidth);
+  cropState.outputHeight = clampNumber(els.cropHeight.value, 8, 2048, cropState.outputHeight);
+  els.cropWidth.value = cropState.outputWidth;
+  els.cropHeight.value = cropState.outputHeight;
+  setupCropCanvas();
+  centerCropImage();
+  setStatus(`Crop window set to ${cropState.outputWidth}x${cropState.outputHeight}. Drag the image to position the crop.`);
 }
 
 function centerCropImage() {
@@ -593,7 +611,7 @@ function cropScaleForMode(mode) {
   if (mode === "free") return Math.max(scaleX, scaleY);
   const sourceScale = Number.parseFloat(mode);
   if (!Number.isFinite(sourceScale) || sourceScale <= 0) return Math.max(scaleX, scaleY);
-  return els.cropCanvas.width / (state.spriteWidth / sourceScale);
+  return els.cropCanvas.width / ((cropState ? cropState.outputWidth : state.spriteWidth) / sourceScale);
 }
 
 function syncCropControls() {
@@ -666,8 +684,8 @@ function drawCrop() {
 function saveCurrentCrop() {
   if (!cropState) return;
   const output = document.createElement("canvas");
-  output.width = state.spriteWidth;
-  output.height = state.spriteHeight;
+  output.width = cropState.outputWidth;
+  output.height = cropState.outputHeight;
   const outputCtx = output.getContext("2d");
   outputCtx.imageSmoothingEnabled = false;
 
@@ -699,7 +717,7 @@ function saveCurrentCrop() {
     els.cropDialog.close();
     renderPalette();
     updateStats();
-    setStatus(`Added ${tile.name} at ${state.spriteWidth}x${state.spriteHeight}.`);
+    setStatus(`Added ${tile.name} at ${output.width}x${output.height}.`);
     processNextCrop();
   };
   image.src = url;
@@ -986,6 +1004,7 @@ els.gridCanvas.addEventListener("pointerleave", () => {
 els.gridCanvas.addEventListener("click", handleGridClick);
 
 els.cropZoom.addEventListener("input", handleCropZoom);
+els.applyCropSize.addEventListener("click", applyCustomCropSize);
 els.cropScaleMode.addEventListener("change", () => setCropScaleMode(els.cropScaleMode.value));
 els.centerCrop.addEventListener("click", centerCropImage);
 els.alignTop.addEventListener("click", () => alignCrop("y", "start"));

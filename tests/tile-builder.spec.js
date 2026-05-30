@@ -488,6 +488,51 @@ test("locks crop source scale and aligns to the bottom half of a tall PNG", asyn
   expect(sampled[3]).toBe(255);
 });
 
+test("resizes and repositions a custom crop window when importing one PNG", async ({ page }) => {
+  await openApp(page);
+  await setProject(page, { cols: 2, rows: 2, tileWidth: 64, tileHeight: 32, spriteWidth: 128, spriteHeight: 128 });
+
+  await page.locator("#fileInput").setInputFiles({
+    name: "custom-crop.png",
+    mimeType: "image/png",
+    buffer: pngs.splitTall
+  });
+
+  await expect(page.locator("#cropDialog")).toHaveJSProperty("open", true);
+  await page.locator("#cropWidth").fill("64");
+  await page.locator("#cropHeight").fill("32");
+  await page.getByRole("button", { name: "Apply Crop Size" }).click();
+  await expect(page.locator("#projectStatus")).toHaveText(
+    "Crop window set to 64x32. Drag the image to position the crop."
+  );
+  await expect(page.locator("#cropCanvas")).toHaveJSProperty("width", 560);
+  await expect(page.locator("#cropCanvas")).toHaveJSProperty("height", 280);
+
+  await page.locator("#cropScaleMode").selectOption("1");
+  await expect(page.locator("#cropSourceInfo")).toHaveText("Crop source: 64x32px (1x locked)");
+  await page.getByRole("button", { name: "Bottom" }).click();
+  await page.getByRole("button", { name: "Add Tile" }).click();
+
+  const inspected = await page.locator(".tile-card img").evaluate(async (image) => {
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0);
+    return {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      sample: [...ctx.getImageData(32, 16, 1, 1).data]
+    };
+  });
+
+  expect(inspected.width).toBe(64);
+  expect(inspected.height).toBe(32);
+  expect(inspected.sample[2]).toBeGreaterThan(inspected.sample[0]);
+  expect(inspected.sample[3]).toBe(255);
+});
+
 test("exports placed tiles as a Y-then-X sorted packed PNG", async ({ page }) => {
   await openApp(page);
   await setProject(page);

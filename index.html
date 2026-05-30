@@ -136,6 +136,17 @@
           <button id="skipCrop" class="icon-button" value="skip" type="button" aria-label="Skip this PNG">&times;</button>
         </div>
         <canvas id="cropCanvas" width="560" height="280"></canvas>
+        <div class="crop-size-tools">
+          <label>
+            Crop width
+            <input id="cropWidth" type="number" min="8" max="2048" value="128">
+          </label>
+          <label>
+            Crop height
+            <input id="cropHeight" type="number" min="8" max="2048" value="128">
+          </label>
+          <button id="applyCropSize" class="secondary-button" type="button">Apply Crop Size</button>
+        </div>
         <div class="crop-scale-tools">
           <label>
             Source scale
