@@ -18,6 +18,7 @@ const state = {
     }
   ],
   activeLayerId: "layer-1",
+  pickedPlacement: null,
   hoverCell: null,
   viewerScale: 1,
   userSetViewerScale: false
@@ -115,6 +116,10 @@ function allPlacementsSorted() {
   });
 }
 
+function clearPickedPlacement() {
+  state.pickedPlacement = null;
+}
+
 function readSettings() {
   return {
     cols: clampNumber(els.gridCols.value, 1, 64, state.cols),
@@ -145,6 +150,7 @@ function applySettings() {
   if (resolutionChanged) {
     state.tiles = [];
     state.selectedTileId = null;
+    clearPickedPlacement();
     state.layers.forEach((layer) => layer.placements.clear());
     tileCounter = 1;
     setStatus("Tile size changed. Existing tiles were cleared so new crops match the export size.");
@@ -155,6 +161,9 @@ function applySettings() {
           layer.placements.delete(key);
         }
       }
+    }
+    if (state.pickedPlacement && (state.pickedPlacement.x >= state.cols || state.pickedPlacement.y >= state.rows)) {
+      clearPickedPlacement();
     }
     setStatus("Grid settings applied.");
   } else {
@@ -324,6 +333,15 @@ function renderPalette() {
   }
 }
 
+function selectedTileLabel() {
+  if (state.pickedPlacement) {
+    const tile = state.tiles.find((item) => item.id === state.pickedPlacement.tileId);
+    return tile ? `Moving ${tile.name}` : "Moving tile";
+  }
+  const selected = state.tiles.find((tile) => tile.id === state.selectedTileId);
+  return selected ? selected.name : "None";
+}
+
 function renderLayers() {
   els.layerSelect.replaceChildren();
   for (const layer of state.layers) {
@@ -348,8 +366,7 @@ function updateToolButtons() {
 
 function updateStats() {
   els.placedCount.textContent = String(placedTileCount());
-  const selected = state.tiles.find((tile) => tile.id === state.selectedTileId);
-  els.selectedTileName.textContent = selected ? selected.name : "None";
+  els.selectedTileName.textContent = selectedTileLabel();
 }
 
 function viewerScaleLabel() {
@@ -706,19 +723,52 @@ function handleGridClick(event) {
   const layer = activeLayer();
   if (state.tool === "erase") {
     layer.placements.delete(key);
+    if (state.pickedPlacement && state.pickedPlacement.layerId === layer.id && state.pickedPlacement.key === key) {
+      clearPickedPlacement();
+    }
   } else if (state.tool === "drop") {
-    if (!state.selectedTileId) {
-      setStatus("Select a tile before dropping onto the grid.");
+    const existing = layer.placements.get(key);
+    if (state.pickedPlacement) {
+      if (existing) {
+        setStatus("Drop mode only moves tiles into empty spots.");
+        return;
+      }
+      const sourceLayer = state.layers.find((item) => item.id === state.pickedPlacement.layerId);
+      if (!sourceLayer) {
+        clearPickedPlacement();
+        setStatus("The picked tile is no longer available.");
+        return;
+      }
+      sourceLayer.placements.delete(state.pickedPlacement.key);
+      layer.placements.set(key, { x: cell.x, y: cell.y, tileId: state.pickedPlacement.tileId });
+      const tile = state.tiles.find((item) => item.id === state.pickedPlacement.tileId);
+      clearPickedPlacement();
+      setStatus(`Moved ${tile ? tile.name : "tile"} to ${cell.x}, ${cell.y}.`);
+    } else if (existing) {
+      state.pickedPlacement = {
+        layerId: layer.id,
+        key,
+        x: existing.x,
+        y: existing.y,
+        tileId: existing.tileId
+      };
+      const tile = state.tiles.find((item) => item.id === existing.tileId);
+      setStatus(`Picked up ${tile ? tile.name : "tile"}. Choose an empty spot.`);
+    } else if (!state.selectedTileId) {
+      setStatus("Click a placed tile to pick it up, or select a palette tile to drop.");
       return;
+    } else {
+      layer.placements.set(key, { x: cell.x, y: cell.y, tileId: state.selectedTileId });
+      setStatus(`Dropped tile at ${cell.x}, ${cell.y}.`);
     }
-    if (layer.placements.has(key)) {
-      setStatus("Drop mode only places tiles into empty spots.");
-      return;
-    }
-    layer.placements.set(key, { x: cell.x, y: cell.y, tileId: state.selectedTileId });
   } else if (state.selectedTileId) {
+    if (state.pickedPlacement) clearPickedPlacement();
     layer.placements.set(key, { x: cell.x, y: cell.y, tileId: state.selectedTileId });
   } else {
+    if (state.pickedPlacement) {
+      setStatus("Finish moving the picked tile before painting.");
+      return;
+    }
     setStatus("Select a tile before painting the grid.");
     return;
   }
@@ -730,6 +780,7 @@ function handleGridClick(event) {
 
 function clearGrid() {
   activeLayer().placements.clear();
+  clearPickedPlacement();
   renderGrid();
   renderLayers();
   updateStats();
@@ -746,6 +797,7 @@ function addLayer() {
   };
   state.layers.push(layer);
   state.activeLayerId = layer.id;
+  clearPickedPlacement();
   renderLayers();
   renderGrid();
   updateStats();
@@ -761,6 +813,7 @@ function deleteActiveLayer() {
   const index = state.layers.findIndex((item) => item.id === layer.id);
   state.layers.splice(index, 1);
   state.activeLayerId = state.layers[Math.max(0, index - 1)].id;
+  if (state.pickedPlacement && state.pickedPlacement.layerId === layer.id) clearPickedPlacement();
   renderLayers();
   renderGrid();
   updateStats();
@@ -770,6 +823,7 @@ function deleteActiveLayer() {
 function setActiveLayer(layerId) {
   if (!state.layers.some((layer) => layer.id === layerId)) return;
   state.activeLayerId = layerId;
+  clearPickedPlacement();
   renderLayers();
   setStatus(`${activeLayer().name} selected.`);
 }
@@ -974,6 +1028,7 @@ window.__tileBuilderDebug = {
       activeLayerId: state.activeLayerId,
       activeLayerName: activeLayer().name,
       layerPlacements: state.layers.map((layer) => ({ name: layer.name, count: layer.placements.size, visible: layer.visible })),
+      pickedPlacement: state.pickedPlacement,
       selectedTileId: state.selectedTileId
     };
   }

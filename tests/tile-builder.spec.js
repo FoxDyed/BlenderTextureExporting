@@ -370,27 +370,35 @@ test("uploads, crops, places, erases, and clears a PNG tile", async ({ page }) =
   await expect(page.locator("#placedCount")).toHaveText("0");
 });
 
-test("drops selected tiles only into empty grid cells", async ({ page }) => {
+test("drop mode moves placed tiles only into empty grid cells", async ({ page }) => {
   await openApp(page);
   await setProject(page);
   await addTile(page, "red.png", pngs.red);
   await addTile(page, "blue.png", pngs.blue);
 
-  await page.getByRole("button", { name: "Drop" }).click();
-  await expect(page.getByRole("button", { name: "Drop" })).toHaveClass(/is-active/);
-
   await page.locator(".tile-card", { hasText: "red.png" }).click();
   await clickCell(page, 1, 1);
-  await expect(page.locator("#placedCount")).toHaveText("1");
-
   await page.locator(".tile-card", { hasText: "blue.png" }).click();
-  await expect(page.getByRole("button", { name: "Drop" })).toHaveClass(/is-active/);
+  await clickCell(page, 2, 1);
+  await expect(page.locator("#placedCount")).toHaveText("2");
+
+  await page.getByRole("button", { name: "Move" }).click();
+  await expect(page.getByRole("button", { name: "Move" })).toHaveClass(/is-active/);
+
   await clickCell(page, 1, 1);
-  await expect(page.locator("#placedCount")).toHaveText("1");
-  await expect(page.locator("#projectStatus")).toHaveText("Drop mode only places tiles into empty spots.");
+  await expect(page.locator("#projectStatus")).toHaveText("Picked up red.png. Choose an empty spot.");
+  await expect(page.locator("#selectedTileName")).toHaveText("Moving red.png");
 
   await clickCell(page, 2, 1);
   await expect(page.locator("#placedCount")).toHaveText("2");
+  await expect(page.locator("#projectStatus")).toHaveText("Drop mode only moves tiles into empty spots.");
+  await expect(page.evaluate(() => window.__tileBuilderDebug.getState().pickedPlacement)).resolves.not.toBeNull();
+
+  await clickCell(page, 0, 1);
+  await expect(page.locator("#placedCount")).toHaveText("2");
+  await expect(page.locator("#projectStatus")).toHaveText("Moved red.png to 0, 1.");
+  await expect(page.locator("#selectedTileName")).toHaveText("blue.png");
+  await expect(page.evaluate(() => window.__tileBuilderDebug.getState().pickedPlacement)).resolves.toBeNull();
 
   await page.getByRole("button", { name: "Export PNG" }).click();
   const exportInfo = await page.waitForFunction(() => window.__lastTileDownload);
