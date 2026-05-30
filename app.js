@@ -261,9 +261,10 @@ function tileDrawRect(tile, cell) {
   const center = cellCenter(cell.x, cell.y);
   const width = tile.width || tile.image.naturalWidth || state.spriteWidth;
   const height = tile.height || tile.image.naturalHeight || state.spriteHeight;
+  const bounds = tile.bounds || { x: 0, y: 0, width, height };
   return {
-    x: center.x - width / 2,
-    y: center.y + state.tileHeight / 2 - height,
+    x: center.x - (bounds.x + bounds.width / 2),
+    y: center.y + state.tileHeight / 2 - (bounds.y + bounds.height),
     width,
     height
   };
@@ -432,6 +433,7 @@ async function enqueueFiles(files) {
 function addTileFromCanvas(canvas, name) {
   return new Promise((resolve) => {
     const url = canvas.toDataURL("image/png");
+    const bounds = visiblePixelBounds(canvas);
     const image = new Image();
     image.onload = () => {
       const tile = {
@@ -440,7 +442,8 @@ function addTileFromCanvas(canvas, name) {
         url,
         image,
         width: canvas.width,
-        height: canvas.height
+        height: canvas.height,
+        bounds
       };
       tileCounter += 1;
       state.tiles.push(tile);
@@ -451,13 +454,27 @@ function addTileFromCanvas(canvas, name) {
   });
 }
 
-function tileHasVisiblePixels(canvas) {
+function visiblePixelBounds(canvas) {
   const ctx = canvas.getContext("2d");
   const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  for (let index = 3; index < pixels.length; index += 4) {
-    if (pixels[index] > 0) return true;
+  let minX = canvas.width;
+  let minY = canvas.height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < canvas.height; y += 1) {
+    for (let x = 0; x < canvas.width; x += 1) {
+      const alpha = pixels[(y * canvas.width + x) * 4 + 3];
+      if (alpha === 0) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
   }
-  return false;
+
+  if (maxX === -1) return null;
+  return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
 }
 
 async function importSpritesheet(file) {
@@ -493,7 +510,7 @@ async function importSpritesheet(file) {
           state.spriteWidth,
           state.spriteHeight
         );
-        if (!tileHasVisiblePixels(tileCanvas)) continue;
+        if (!visiblePixelBounds(tileCanvas)) continue;
         await addTileFromCanvas(tileCanvas, `${baseName}_${row + 1}_${column + 1}.png`);
         imported += 1;
       }
@@ -662,6 +679,7 @@ function saveCurrentCrop() {
   outputCtx.drawImage(cropState.image, sx, sy, sw, sh, 0, 0, output.width, output.height);
 
   const url = output.toDataURL("image/png");
+  const bounds = visiblePixelBounds(output);
   const image = new Image();
   image.onload = () => {
     const tile = {
@@ -670,7 +688,8 @@ function saveCurrentCrop() {
       url,
       image,
       width: output.width,
-      height: output.height
+      height: output.height,
+      bounds
     };
     tileCounter += 1;
     state.tiles.push(tile);

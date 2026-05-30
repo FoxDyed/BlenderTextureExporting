@@ -118,6 +118,41 @@ function createTileGridPng(tileWidth, tileHeight, colors) {
   ]);
 }
 
+function createPaddedTilePng(width, height, top, bottom, color) {
+  const signature = Buffer.from("89504e470d0a1a0a", "hex");
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+
+  const stride = 1 + width * 4;
+  const rawPixels = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y += 1) {
+    const rowStart = y * stride;
+    rawPixels[rowStart] = 0;
+    for (let x = 0; x < width; x += 1) {
+      const pixelStart = rowStart + 1 + x * 4;
+      if (y >= top && y <= bottom) {
+        rawPixels[pixelStart] = color[0];
+        rawPixels[pixelStart + 1] = color[1];
+        rawPixels[pixelStart + 2] = color[2];
+        rawPixels[pixelStart + 3] = color[3];
+      }
+    }
+  }
+
+  return Buffer.concat([
+    signature,
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", zlib.deflateSync(rawPixels)),
+    pngChunk("IEND", Buffer.alloc(0))
+  ]);
+}
+
 function readPngSize(buffer) {
   expect(buffer.subarray(0, 8)).toEqual(Buffer.from("89504e470d0a1a0a", "hex"));
   return {
@@ -614,6 +649,55 @@ test("imports 128px sprites onto a 128x64 isometric grid without splitting cells
   expect(inspected.sprite).toEqual([128, 128]);
   expect(inspected.topSample[2]).toBeGreaterThan(inspected.topSample[0]);
   expect(inspected.bottomSample[2]).toBeGreaterThan(inspected.bottomSample[0]);
+});
+
+test("anchors visible terrain pixels to the grid when imported sprites include bottom padding", async ({ page }) => {
+  await openApp(page);
+  await setProject(page, {
+    cols: 3,
+    rows: 3,
+    tileWidth: 64,
+    tileHeight: 32,
+    spriteWidth: 64,
+    spriteHeight: 64,
+    exportCols: 1
+  });
+
+  await page.locator("#sheetFileInput").setInputFiles({
+    name: "padded-ground.png",
+    mimeType: "image/png",
+    buffer: createPaddedTilePng(64, 64, 20, 49, [0, 0, 255, 255])
+  });
+
+  await expect(page.locator(".tile-card")).toHaveCount(1);
+  await clickCell(page, 1, 1);
+  await page.getByRole("button", { name: "Export Map PNG" }).click();
+
+  const exportInfo = await page.waitForFunction(() => window.__lastTileDownload);
+  const exported = await exportInfo.jsonValue();
+  const inspected = await page.evaluate(async (href) => {
+    const image = new Image();
+    image.src = href;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0);
+    const state = window.__tileBuilderDebug.getState();
+    const pad = Math.max(32, Math.ceil(Math.max(state.tileWidth, state.spriteHeight) * 0.35));
+    const centerX = pad + (state.rows - 1) * state.tileWidth / 2 + state.tileWidth / 2;
+    const centerY = pad + state.tileHeight / 2 + (1 + 1) * state.tileHeight / 2;
+    const diamondBottom = centerY + state.tileHeight / 2;
+    return {
+      anchored: [...ctx.getImageData(centerX, diamondBottom - 1, 1, 1).data],
+      below: [...ctx.getImageData(centerX, diamondBottom + 1, 1, 1).data]
+    };
+  }, exported.href);
+
+  expect(inspected.anchored[2]).toBeGreaterThan(inspected.anchored[0]);
+  expect(inspected.anchored[3]).toBe(255);
+  expect(inspected.below[3]).toBe(0);
 });
 
 test("batch terrain CLI crops directional tiles and reports missing terrain variants", async () => {
